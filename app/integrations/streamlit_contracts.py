@@ -55,3 +55,20 @@ class OnSafeBackend:
 
     def build_daily_report(self) -> str:
         return self.report_service.build_daily_report()
+
+    def get_browser_runtime(self, camera_id: int):
+        camera = self.camera_service.get_camera(camera_id)
+        if camera is None:
+            raise ValueError("Camera nao encontrada.")
+        config = CameraConfig(
+            name=camera.name,
+            host=camera.host,
+            port=camera.port,
+            username=camera.username,
+            password=camera.password,
+            protocol=camera.protocol,
+            stream_path=camera.stream_path,
+            enabled=camera.enabled,
+            required_ppe=camera.required_ppe,
+        )
+        return self.monitor_manager.get_browser_runtime(camera_id, config)

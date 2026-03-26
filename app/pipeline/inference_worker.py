@@ -46,6 +46,7 @@ class InferenceWorker:
         self._stop_event = threading.Event()
         self._trigger = queue.Queue(maxsize=1)
         self._last_processed_ts: datetime | None = None
+        self._event_history: dict[tuple[int, tuple[str, ...]], float] = {}
         self.inference_fps = 0.0
         self.latest_decision: DecisionState | None = None
 
@@ -107,7 +108,10 @@ class InferenceWorker:
                     timestamp=packet.timestamp,
                 )
                 self.latest_decision = latest_decision.state
-                if latest_decision.state == DecisionState.CONFIRMED_NON_COMPLIANCE:
+                if (
+                    latest_decision.state == DecisionState.CONFIRMED_NON_COMPLIANCE
+                    and self._should_emit_event(latest_decision, time.monotonic())
+                ):
                     self.evidence_writer.enqueue(
                         EvidenceJob(
                             camera_name=self.config.name,
@@ -149,3 +153,11 @@ class InferenceWorker:
                     latest_decision=self.latest_decision.value if self.latest_decision else None,
                 )
                 session.commit()
+
+    def _should_emit_event(self, decision, monotonic_now: float) -> bool:
+        key = (decision.track_id, tuple(sorted(decision.missing_ppe)))
+        last_emitted = self._event_history.get(key, 0.0)
+        if monotonic_now - last_emitted < 15.0:
+            return False
+        self._event_history[key] = monotonic_now
+        return True

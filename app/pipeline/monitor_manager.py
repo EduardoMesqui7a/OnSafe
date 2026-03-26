@@ -9,6 +9,7 @@ from app.core.enums import CameraHealth
 from app.core.schemas import CameraConfig, CameraStatus
 from app.detectors.yolo_engine import YoloEngine
 from app.pipeline.camera_reader import CameraReader
+from app.pipeline.browser_runtime import BrowserCameraRuntime
 from app.pipeline.compliance_engine import ComplianceEngine
 from app.pipeline.evidence_writer import EvidenceWriter
 from app.pipeline.frame_store import FrameStore
@@ -34,6 +35,7 @@ class MonitorManager:
         self.evidence_writer = EvidenceWriter(settings)
         self.report_worker = ReportWorker(settings)
         self._bundles: dict[int, RuntimeBundle] = {}
+        self._browser_runtimes: dict[int, BrowserCameraRuntime] = {}
         self._tick_thread = threading.Thread(target=self._tick, name="monitor-tick", daemon=True)
         self._stop_event = threading.Event()
         self._tick_started = False
@@ -56,6 +58,8 @@ class MonitorManager:
         self._bundles[camera_id] = RuntimeBundle(frame_store, reader, scheduler, worker, tracker)
 
     def start_camera(self, camera_id: int) -> None:
+        if camera_id in self._browser_runtimes:
+            return
         bundle = self._bundles[camera_id]
         bundle.reader.start()
         bundle.worker.start()
@@ -66,6 +70,8 @@ class MonitorManager:
             self._tick_started = True
 
     def stop_camera(self, camera_id: int) -> None:
+        if camera_id in self._browser_runtimes:
+            return
         bundle = self._bundles[camera_id]
         bundle.reader.stop()
         bundle.worker.stop()
@@ -77,12 +83,18 @@ class MonitorManager:
         self._tick_started = False
 
     def get_frame(self, camera_id: int):
+        browser_runtime = self._browser_runtimes.get(camera_id)
+        if browser_runtime is not None:
+            return browser_runtime.get_frame()
         bundle = self._bundles.get(camera_id)
         if bundle is None:
             return None
         return bundle.frame_store.get_latest_annotated() or bundle.frame_store.get_latest_raw()
 
     def get_status(self, camera_id: int) -> CameraStatus:
+        browser_runtime = self._browser_runtimes.get(camera_id)
+        if browser_runtime is not None:
+            return browser_runtime.get_status()
         bundle = self._bundles[camera_id]
         return CameraStatus(
             camera_id=camera_id,
@@ -95,8 +107,25 @@ class MonitorManager:
         )
 
     def list_active_tracks(self, camera_id: int):
+        browser_runtime = self._browser_runtimes.get(camera_id)
+        if browser_runtime is not None:
+            return browser_runtime.list_active_tracks()
         bundle = self._bundles[camera_id]
         return bundle.tracker.list_active_tracks(camera_id)
+
+    def get_browser_runtime(self, camera_id: int, config: CameraConfig) -> BrowserCameraRuntime:
+        runtime = self._browser_runtimes.get(camera_id)
+        if runtime is None:
+            runtime = BrowserCameraRuntime(
+                camera_id=camera_id,
+                config=config,
+                settings=self.settings,
+                evidence_writer=self.evidence_writer,
+                report_worker=self.report_worker,
+                model_path=self.model_path,
+            )
+            self._browser_runtimes[camera_id] = runtime
+        return runtime
 
     def _tick(self) -> None:
         while not self._stop_event.is_set():

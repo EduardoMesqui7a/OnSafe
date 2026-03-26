@@ -4,6 +4,18 @@ from datetime import datetime
 
 import streamlit as st
 
+try:
+    import av
+except Exception:  # pragma: no cover - optional dependency
+    av = None
+
+try:
+    from streamlit_webrtc import VideoProcessorBase, WebRtcMode, webrtc_streamer
+except Exception:  # pragma: no cover - optional dependency
+    VideoProcessorBase = object
+    WebRtcMode = None
+    webrtc_streamer = None
+
 from app.core.config import get_settings
 from app.core.enums import Protocol
 from app.core.schemas import CameraConfig
@@ -93,14 +105,49 @@ def _render_status_badge(health: str) -> str:
     return mapping.get(health, health.upper())
 
 
-def render_browser_camera(camera) -> None:
+def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
+    status = backend.get_camera_status(camera_id)
+    metric1, metric2, metric3, metric4 = st.columns(4)
+    metric1.metric("Capture FPS", f"{status.capture_fps:.1f}")
+    metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
+    metric3.metric("Tracks ativos", status.active_tracks)
+    metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
+
+    tracks = backend.list_active_tracks(camera_id)
+    if tracks:
+        st.write("Pessoas rastreadas:")
+        for track in tracks:
+            st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
+
+
+def render_browser_camera(backend: OnSafeBackend, camera) -> None:
     st.info("Modo navegador: funciona no Streamlit Cloud e usa a webcam do browser do usuario.")
-    snapshot = st.camera_input("Capturar frame da webcam", key=f"browser_camera_{camera.id}")
-    if snapshot is not None:
-        st.image(snapshot, caption=f"Frame capturado em {datetime.now().strftime('%H:%M:%S')}")
-        st.success("Webcam do navegador conectada. Este modo e ideal para testes e captura pontual no Streamlit Cloud.")
-    else:
-        st.caption("Permita o acesso a webcam no navegador e capture um frame para testar.")
+    runtime = backend.get_browser_runtime(camera.id)
+    st.write(_render_status_badge(runtime.get_status().health.value))
+
+    if webrtc_streamer is None or av is None:
+        st.warning("streamlit-webrtc indisponivel neste ambiente. Usando captura pontual como fallback.")
+        snapshot = st.camera_input("Capturar frame da webcam", key=f"browser_camera_fallback_{camera.id}")
+        if snapshot is not None:
+            st.image(snapshot, caption=f"Frame capturado em {datetime.now().strftime('%H:%M:%S')}")
+            st.info("Para analise continua em nuvem, habilite streamlit-webrtc nas dependencias.")
+        return
+
+    class BrowserVideoProcessor(VideoProcessorBase):
+        def recv(self, frame):
+            image = frame.to_ndarray(format="bgr24")
+            processed = runtime.process_frame(image)
+            return av.VideoFrame.from_ndarray(processed, format="bgr24")
+
+    webrtc_streamer(
+        key=f"browser_webrtc_{camera.id}",
+        mode=WebRtcMode.SENDRECV,
+        media_stream_constraints={"video": True, "audio": False},
+        video_processor_factory=BrowserVideoProcessor,
+        async_processing=True,
+    )
+    _render_browser_status(backend, camera.id)
+    st.caption("Ao manter o stream ativo, o backend continua analisando os frames, registrando eventos e gerando relatorios.")
 
 
 def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
@@ -183,7 +230,7 @@ def render_monitoring(backend: OnSafeBackend) -> None:
             if camera.uses_browser_input():
                 st.markdown(f"### {camera.name}")
                 st.caption(camera.build_stream_url())
-                render_browser_camera(camera)
+                render_browser_camera(backend, camera)
             else:
                 render_network_or_local_camera(backend, camera)
 

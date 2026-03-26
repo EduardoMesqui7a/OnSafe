@@ -30,6 +30,7 @@ class Settings(BaseModel):
     save_event_video: bool = False
     event_video_fps: int = 6
     post_event_seconds: int = 5
+    event_cooldown_seconds: int = 15
     reconnect_delay_seconds: float = 2.0
     max_test_frames: int = 5
     report_title: str = "OnSafe - Relatorio Tecnico de EPI"
