@@ -54,6 +54,7 @@ class CameraStatusRepository:
         latency_ms: float = 0.0,
         active_tracks: int = 0,
         latest_decision: str | None = None,
+        status_message: str | None = None,
     ) -> CameraStatusModel:
         status = self.session.get(CameraStatusModel, camera_id)
         if status is None:
@@ -66,6 +67,7 @@ class CameraStatusRepository:
         status.latency_ms = latency_ms
         status.active_tracks = active_tracks
         status.latest_decision = latest_decision
+        status.status_message = status_message
         self.session.flush()
         return status
 

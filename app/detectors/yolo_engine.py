@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.detectors.class_map import SUPPORTED_CLASSES
+from app.detectors.class_map import HELMET_CLASS, PERSON_CLASS, SUPPORTED_CLASSES, VEST_CLASS
 from app.detectors.model_registry import load_model
 
 
@@ -21,11 +21,28 @@ class YoloEngine:
         self.image_size = image_size
         self.tracker_config = tracker_config
         self._model = None
+        self.active_model_path = model_path
+        self.last_load_error: str | None = None
+        self.available_classes: set[str] = set()
 
     def _get_model(self):
         if self._model is None:
-            self._model = load_model(self.model_path)
+            try:
+                self._model = load_model(self.model_path)
+                self.active_model_path = self.model_path
+                self.last_load_error = None
+            except FileNotFoundError as exc:
+                self.last_load_error = str(exc)
+                fallback = "yolov8n.pt"
+                self._model = load_model(fallback)
+                self.active_model_path = fallback
         return self._model
+
+    def supports_ppe(self) -> bool:
+        return HELMET_CLASS in self.available_classes and VEST_CLASS in self.available_classes
+
+    def supports_person(self) -> bool:
+        return PERSON_CLASS in self.available_classes
 
     def infer(self, frame: Any) -> list[Detection]:
         model = self._get_model()
@@ -35,6 +52,7 @@ class YoloEngine:
         detections: list[Detection] = []
         result = results[0]
         names = getattr(result, "names", {})
+        self.available_classes = {name for name in names.values()}
         boxes = getattr(result, "boxes", None)
         if boxes is None:
             return detections

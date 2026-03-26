@@ -46,6 +46,7 @@ class CameraStatusModel(Base):
     latency_ms: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     active_tracks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     latest_decision: Mapped[str | None] = mapped_column(String(64))
+    status_message: Mapped[str | None] = mapped_column(String(255))
 
 
 class Event(Base):

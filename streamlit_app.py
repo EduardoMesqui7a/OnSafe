@@ -107,6 +107,8 @@ def _render_status_badge(health: str) -> str:
 
 def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
     status = backend.get_camera_status(camera_id)
+    if status.status_message:
+        st.warning(status.status_message)
     metric1, metric2, metric3, metric4 = st.columns(4)
     metric1.metric("Capture FPS", f"{status.capture_fps:.1f}")
     metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
@@ -195,6 +197,8 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
     metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
     metric3.metric("Tracks ativos", status.active_tracks)
     metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
+    if status.status_message:
+        st.warning(status.status_message)
 
     packet = backend.get_live_snapshot(camera.id)
     if packet is not None:

@@ -47,6 +47,7 @@ class BrowserCameraRuntime:
         self.capture_fps = 0.0
         self.inference_fps = 0.0
         self.latest_decision: DecisionState | None = None
+        self.status_message: str | None = None
         self.last_frame_ts: datetime | None = None
         self.health = CameraHealth.STARTING
         self._capture_count = 0
@@ -74,29 +75,44 @@ class BrowserCameraRuntime:
             except Exception as exc:  # pragma: no cover - depends on env/model
                 logger.exception("Browser inference failed for camera %s: %s", self.camera_id, exc)
                 self.health = CameraHealth.DEGRADED
+                self.status_message = str(exc)
                 self._persist_status(active_tracks=len(self.tracker.list_active_tracks(self.camera_id)))
                 return frame
 
             self.frame_store.update_annotated(self.camera_id, frame, timestamp)
             self._infer_count += 1
             self._update_inference_fps()
+            if self.yolo_engine.last_load_error:
+                self.status_message = (
+                    f"{self.yolo_engine.last_load_error}. "
+                    f"Fallback ativo: {self.yolo_engine.active_model_path}. "
+                    "Deteccao de pessoa habilitada, mas eventos de EPI exigem pesos customizados."
+                )
+            elif not self.yolo_engine.supports_ppe():
+                self.status_message = (
+                    f"Modelo ativo: {self.yolo_engine.active_model_path}. "
+                    "Classes de EPI nao encontradas; somente rastreamento de pessoa esta disponivel."
+                )
+            else:
+                self.status_message = f"Modelo ativo: {self.yolo_engine.active_model_path}"
             person_detections = [item for item in detections if item.class_name == PERSON_CLASS and item.track_id is not None]
             active_tracks = 0
 
             for person in person_detections:
                 active_tracks += 1
                 track = self.tracker.update_track(self.camera_id, person.track_id or 0, person.bbox, timestamp)
-                association = associate_ppe(track, detections)
-                decision = self.compliance_engine.evaluate(
-                    camera_id=self.camera_id,
-                    track=track,
-                    association=association,
-                    required_ppe=self.config.required_ppe,
-                    timestamp=timestamp,
-                )
-                self.latest_decision = decision.state
-                if decision.state == DecisionState.CONFIRMED_NON_COMPLIANCE and self._should_emit_event(decision, time.monotonic()):
-                    self._emit_event(decision, timestamp)
+                if self.yolo_engine.supports_ppe():
+                    association = associate_ppe(track, detections)
+                    decision = self.compliance_engine.evaluate(
+                        camera_id=self.camera_id,
+                        track=track,
+                        association=association,
+                        required_ppe=self.config.required_ppe,
+                        timestamp=timestamp,
+                    )
+                    self.latest_decision = decision.state
+                    if decision.state == DecisionState.CONFIRMED_NON_COMPLIANCE and self._should_emit_event(decision, time.monotonic()):
+                        self._emit_event(decision, timestamp)
 
             self._persist_status(active_tracks=active_tracks)
             annotated = self.frame_store.get_latest_annotated()
@@ -111,6 +127,7 @@ class BrowserCameraRuntime:
             inference_fps=self.inference_fps,
             active_tracks=len(self.tracker.list_active_tracks(self.camera_id)),
             latest_decision=self.latest_decision,
+            status_message=self.status_message,
         )
 
     def list_active_tracks(self):
@@ -187,5 +204,6 @@ class BrowserCameraRuntime:
                 inference_fps=self.inference_fps,
                 active_tracks=active_tracks,
                 latest_decision=self.latest_decision.value if self.latest_decision else None,
+                status_message=self.status_message,
             )
             session.commit()

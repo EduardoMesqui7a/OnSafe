@@ -104,6 +104,7 @@ class MonitorManager:
             inference_fps=bundle.worker.inference_fps,
             active_tracks=len(bundle.tracker.list_active_tracks(camera_id)),
             latest_decision=bundle.worker.latest_decision,
+            status_message=bundle.worker.status_message,
         )
 
     def list_active_tracks(self, camera_id: int):

@@ -80,6 +80,7 @@ class CameraStatus(BaseModel):
     latency_ms: float = 0.0
     active_tracks: int = 0
     latest_decision: DecisionState | None = None
+    status_message: str | None = None
 
 
 class FramePacket(BaseModel):
