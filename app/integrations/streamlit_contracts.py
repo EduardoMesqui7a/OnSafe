@@ -9,17 +9,22 @@ from app.services.event_service import EventService
 from app.services.health_service import HealthService
 from app.services.monitoring_service import MonitoringService
 from app.services.report_service import ReportService
+from app.storage.database import init_database
 
 
 class OnSafeBackend:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        init_database(settings.database_url)
         self.camera_service = CameraService()
         self.monitor_manager = MonitorManager(settings)
         self.monitoring_service = MonitoringService(self.monitor_manager, self.camera_service)
         self.event_service = EventService()
         self.report_service = ReportService(DailyReportBuilder(settings))
         self.health_service = HealthService()
+
+    def list_cameras(self):
+        return self.camera_service.list_cameras()
 
     def register_camera(self, config: CameraConfig):
         return self.camera_service.register_camera(config)

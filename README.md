@@ -1,6 +1,6 @@
 # OnSafe
 
-Backend em Python para monitoramento de cameras IP com deteccao de EPI, tracking por pessoa e geracao automatica de evidencias e relatorios.
+Aplicacao em Python para monitoramento de cameras IP com deteccao de EPI, tracking por pessoa e geracao automatica de evidencias e relatorios.
 
 ## Principios
 
@@ -13,7 +13,7 @@ Backend em Python para monitoramento de cameras IP com deteccao de EPI, tracking
 
 - `app/core`: configuracoes, enums e DTOs
 - `app/storage`: banco SQLite, modelos e repositorios
-- `app/services`: contratos de alto nivel para a futura UI Streamlit
+- `app/services`: contratos de alto nivel consumidos pela UI Streamlit
 - `app/pipeline`: captura, tracking, conformidade, evidencias e orquestracao
 - `app/reporting`: geracao de HTML/PDF
 - `app/scripts`: scripts operacionais
@@ -25,9 +25,12 @@ Backend em Python para monitoramento de cameras IP com deteccao de EPI, tracking
 3. Iniciar monitoramento com `MonitoringService`
 4. Consumir status, snapshots, tracks e eventos pelo contrato em `app/integrations/streamlit_contracts.py`
 
+## Entry point do Streamlit
+
+- Arquivo principal para deploy: `streamlit_app.py`
+
 ## Observacoes
 
-- A camada Streamlit nao esta implementada aqui por decisao de escopo.
 - `WeasyPrint` e `Ultralytics` sao opcionais em runtime. O backend continua operacional com fallback quando esses pacotes nao estiverem disponiveis.
 
 ## Exemplo rapido
