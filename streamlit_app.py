@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Iterable
-
 import streamlit as st
 
 from app.core.config import get_settings
@@ -23,7 +21,7 @@ def render_camera_form(backend: OnSafeBackend) -> None:
         with col1:
             name = st.text_input("Nome da camera", placeholder="Portaria")
             host = st.text_input("IP ou host", placeholder="192.168.0.10 ou 0 para webcam local")
-            port = st.number_input("Porta", min_value=1, max_value=65535, value=554)
+            port = st.number_input("Porta", min_value=0, max_value=65535, value=554)
             protocol = st.selectbox("Protocolo", options=[item.value for item in Protocol], index=0)
         with col2:
             username = st.text_input("Usuario")
@@ -52,11 +50,11 @@ def render_camera_form(backend: OnSafeBackend) -> None:
 
 def _render_status_badge(health: str) -> str:
     mapping = {
-        "online": "🟢 ONLINE",
-        "offline": "🔴 OFFLINE",
-        "degraded": "🟠 INSTAVEL",
-        "starting": "🟡 INICIANDO",
-        "stopped": "⚪ PARADA",
+        "online": "ONLINE",
+        "offline": "OFFLINE",
+        "degraded": "INSTAVEL",
+        "starting": "INICIANDO",
+        "stopped": "PARADA",
     }
     return mapping.get(health, health.upper())
 
@@ -84,6 +82,10 @@ def render_monitoring(backend: OnSafeBackend) -> None:
                 st.caption(camera.build_stream_url())
                 if str(camera.host).strip() == "0":
                     st.caption("Fonte local detectada: webcam do notebook")
+                    st.warning(
+                        "Host 0 funciona apenas quando o app roda localmente na mesma maquina. "
+                        "No Streamlit Cloud, use uma camera IP/RTSP."
+                    )
                 st.write(_render_status_badge(status.health.value))
             with col2:
                 if st.button("Testar", key=f"test_{camera.id}"):
