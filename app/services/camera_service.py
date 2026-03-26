@@ -32,6 +32,7 @@ class CameraService:
 
     def test_camera(self, config: CameraConfig) -> CameraTestResult:
         stream_url = config.build_stream_url()
+        capture_source = config.get_capture_source()
         if cv2 is None:
             return CameraTestResult(
                 success=False,
@@ -40,12 +41,12 @@ class CameraService:
                 stream_url=stream_url,
             )
         started = time.perf_counter()
-        capture = cv2.VideoCapture(stream_url)
+        capture = cv2.VideoCapture(capture_source)
         if not capture.isOpened():
             return CameraTestResult(
                 success=False,
                 status=CameraHealth.OFFLINE,
-                message="Nao foi possivel abrir o stream.",
+                message="Nao foi possivel abrir a camera local." if config.uses_local_device() else "Nao foi possivel abrir o stream.",
                 stream_url=stream_url,
             )
         ok, _ = capture.read()
@@ -54,7 +55,7 @@ class CameraService:
         return CameraTestResult(
             success=ok,
             status=CameraHealth.ONLINE if ok else CameraHealth.DEGRADED,
-            message="Stream acessivel." if ok else "Conexao aberta, mas sem leitura de frame.",
+            message="Camera local acessivel." if ok and config.uses_local_device() else "Stream acessivel." if ok else "Conexao aberta, mas sem leitura de frame.",
             latency_ms=latency_ms,
             stream_url=stream_url,
         )

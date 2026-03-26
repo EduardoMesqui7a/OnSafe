@@ -23,3 +23,15 @@ def test_register_and_list_camera(tmp_path):
     assert len(cameras) == 1
     assert cameras[0].required_ppe == ["helmet", "vest"]
     assert cameras[0].build_stream_url() == "rtsp://admin:123@10.0.0.10:554/live"
+
+
+def test_camera_config_host_zero_maps_to_local_device():
+    config = CameraConfig(
+        name="Notebook",
+        host="0",
+        port=554,
+        stream_path="ignored",
+    )
+    assert config.uses_local_device() is True
+    assert config.get_capture_source() == 0
+    assert config.build_stream_url() == "local://0"

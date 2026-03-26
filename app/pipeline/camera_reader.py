@@ -48,11 +48,11 @@ class CameraReader:
             logger.warning("OpenCV is not available. Camera %s cannot start.", self.camera_id)
             return
 
-        stream_url = self.config.build_stream_url()
+        capture_source = self.config.get_capture_source()
         frames = 0
         window_start = time.monotonic()
         while not self._stop_event.is_set():
-            capture = cv2.VideoCapture(stream_url)
+            capture = cv2.VideoCapture(capture_source)
             if not capture.isOpened():
                 self.health = CameraHealth.OFFLINE
                 time.sleep(self.reconnect_delay_seconds)

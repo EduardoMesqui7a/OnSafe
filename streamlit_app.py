@@ -22,7 +22,7 @@ def render_camera_form(backend: OnSafeBackend) -> None:
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("Nome da camera", placeholder="Portaria")
-            host = st.text_input("IP ou host", placeholder="192.168.0.10")
+            host = st.text_input("IP ou host", placeholder="192.168.0.10 ou 0 para webcam local")
             port = st.number_input("Porta", min_value=1, max_value=65535, value=554)
             protocol = st.selectbox("Protocolo", options=[item.value for item in Protocol], index=0)
         with col2:
@@ -82,6 +82,8 @@ def render_monitoring(backend: OnSafeBackend) -> None:
             with col1:
                 st.markdown(f"### {camera.name}")
                 st.caption(camera.build_stream_url())
+                if str(camera.host).strip() == "0":
+                    st.caption("Fonte local detectada: webcam do notebook")
                 st.write(_render_status_badge(status.health.value))
             with col2:
                 if st.button("Testar", key=f"test_{camera.id}"):

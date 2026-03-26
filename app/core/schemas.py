@@ -27,6 +27,8 @@ class CameraConfig(BaseModel):
         return value
 
     def build_stream_url(self) -> str:
+        if self.uses_local_device():
+            return "local://0"
         auth = ""
         if self.username:
             password = self.password or ""
@@ -34,6 +36,12 @@ class CameraConfig(BaseModel):
         base = f"{self.protocol.value}://{auth}{self.host}:{self.port}"
         path = self.stream_path.strip("/")
         return f"{base}/{path}" if path else base
+
+    def uses_local_device(self) -> bool:
+        return str(self.host).strip() == "0"
+
+    def get_capture_source(self) -> str | int:
+        return 0 if self.uses_local_device() else self.build_stream_url()
 
 
 class CameraRecord(CameraConfig):
