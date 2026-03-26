@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.core.schemas import TrackState
-from app.detectors.class_map import HELMET_CLASS, VEST_CLASS
+from app.detectors.class_map import HELMET_CLASS, VEST_CLASS, normalize_class_name
 from app.detectors.yolo_engine import Detection
 from app.pipeline.ppe_association import associate_ppe
 
@@ -26,3 +26,11 @@ def test_associate_ppe_marks_present_when_overlap_is_sufficient():
     association = associate_ppe(track, detections)
     assert association.helmet_present is True
     assert association.vest_present is True
+
+
+def test_class_aliases_are_normalized_to_supported_names():
+    assert normalize_class_name("pessoa") == "person"
+    assert normalize_class_name("capacete") == "helmet"
+    assert normalize_class_name("colete") == "vest"
+    assert normalize_class_name("hardhat") == "helmet"
+    assert normalize_class_name("no helmet") is None

@@ -147,6 +147,14 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
         media_stream_constraints={"video": True, "audio": False},
         video_processor_factory=BrowserVideoProcessor,
         async_processing=True,
+        video_html_attrs={
+            "style": {
+                "width": "100%",
+                "maxWidth": "320px",
+                "height": "220px",
+                "margin": "0 auto",
+            }
+        },
     )
     _render_browser_status(backend, camera.id)
     st.caption("Ao manter o stream ativo, o backend continua analisando os frames, registrando eventos e gerando relatorios.")
@@ -202,7 +210,7 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
 
     packet = backend.get_live_snapshot(camera.id)
     if packet is not None:
-        st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}")
+        st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}", use_container_width=True)
     else:
         st.info("Sem frame disponivel ainda. Teste a conexao ou inicie o monitoramento.")
 
@@ -228,16 +236,24 @@ def render_monitoring(backend: OnSafeBackend) -> None:
         format_func=lambda camera_id: next(camera.name for camera in cameras if camera.id == camera_id),
     )
 
-    for camera in cameras:
-        if camera.id not in selected_ids:
-            continue
-        with st.container(border=True):
-            if camera.uses_browser_input():
-                st.markdown(f"### {camera.name}")
-                st.caption(camera.build_stream_url())
-                render_browser_camera(backend, camera)
-            else:
-                render_network_or_local_camera(backend, camera)
+    selected_cameras = [camera for camera in cameras if camera.id in selected_ids]
+    if not selected_cameras:
+        st.info("Selecione pelo menos uma camera para exibir.")
+        return
+
+    column_count = min(3, max(1, len(selected_cameras)))
+    rows = [selected_cameras[index : index + column_count] for index in range(0, len(selected_cameras), column_count)]
+    for row in rows:
+        columns = st.columns(column_count)
+        for idx, camera in enumerate(row):
+            with columns[idx]:
+                with st.container(border=True):
+                    if camera.uses_browser_input():
+                        st.markdown(f"### {camera.name}")
+                        st.caption(camera.build_stream_url())
+                        render_browser_camera(backend, camera)
+                    else:
+                        render_network_or_local_camera(backend, camera)
 
 
 @st.fragment(run_every=2)
@@ -273,6 +289,19 @@ def render_events_and_reports(backend: OnSafeBackend) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="OnSafe", layout="wide")
+    st.markdown(
+        """
+        <style>
+        img {
+            border-radius: 12px;
+        }
+        [data-testid="stMetric"] {
+            padding: 0.25rem 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     st.title("OnSafe")
     st.caption("Monitoramento de cameras IP com IA de EPI")
     backend = get_backend()

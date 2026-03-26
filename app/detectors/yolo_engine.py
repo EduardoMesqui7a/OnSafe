@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.detectors.class_map import HELMET_CLASS, PERSON_CLASS, SUPPORTED_CLASSES, VEST_CLASS
+from app.detectors.class_map import (
+    HELMET_CLASS,
+    PERSON_CLASS,
+    SUPPORTED_CLASSES,
+    VEST_CLASS,
+    normalize_class_name,
+)
 from app.detectors.model_registry import load_model
 
 
@@ -52,7 +58,12 @@ class YoloEngine:
         detections: list[Detection] = []
         result = results[0]
         names = getattr(result, "names", {})
-        self.available_classes = {name for name in names.values()}
+        normalized_classes = set()
+        for name in names.values():
+            canonical = normalize_class_name(str(name))
+            if canonical:
+                normalized_classes.add(canonical)
+        self.available_classes = normalized_classes
         boxes = getattr(result, "boxes", None)
         if boxes is None:
             return detections
@@ -61,7 +72,8 @@ class YoloEngine:
         cls = boxes.cls.int().tolist()
         ids = boxes.id.int().tolist() if boxes.id is not None else [None] * len(xyxy)
         for bbox, score, cls_idx, track_id in zip(xyxy, conf, cls, ids):
-            class_name = names.get(cls_idx, str(cls_idx))
+            raw_name = names.get(cls_idx, str(cls_idx))
+            class_name = normalize_class_name(str(raw_name))
             if class_name not in SUPPORTED_CLASSES:
                 continue
             detections.append(

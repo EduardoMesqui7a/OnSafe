@@ -5,36 +5,57 @@ from app.detectors.class_map import HELMET_CLASS, VEST_CLASS
 from app.detectors.yolo_engine import Detection
 
 
-def _intersection_ratio(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
-    ax1, ay1, ax2, ay2 = a
-    bx1, by1, bx2, by2 = b
-    ix1 = max(ax1, bx1)
-    iy1 = max(ay1, by1)
-    ix2 = min(ax2, bx2)
-    iy2 = min(ay2, by2)
-    if ix2 <= ix1 or iy2 <= iy1:
-        return 0.0
-    inter = (ix2 - ix1) * (iy2 - iy1)
-    area_a = max((ax2 - ax1) * (ay2 - ay1), 1)
-    area_b = max((bx2 - bx1) * (by2 - by1), 1)
-    return max(inter / area_a, inter / area_b)
+def _item_center(box: tuple[int, int, int, int]) -> tuple[float, float]:
+    x1, y1, x2, y2 = box
+    return 0.5 * (x1 + x2), 0.5 * (y1 + y2)
+
+
+def _inside_region(cx: float, cy: float, region: tuple[float, float, float, float]) -> bool:
+    x1, y1, x2, y2 = region
+    return x1 <= cx <= x2 and y1 <= cy <= y2
+
+
+def _head_region(person_box: tuple[int, int, int, int]) -> tuple[float, float, float, float]:
+    px1, py1, px2, py2 = person_box
+    pw = px2 - px1
+    ph = py2 - py1
+    return (
+        px1 + 0.10 * pw,
+        py1,
+        px2 - 0.10 * pw,
+        py1 + 0.32 * ph,
+    )
+
+
+def _torso_region(person_box: tuple[int, int, int, int]) -> tuple[float, float, float, float]:
+    px1, py1, px2, py2 = person_box
+    pw = px2 - px1
+    ph = py2 - py1
+    return (
+        px1 + 0.12 * pw,
+        py1 + 0.28 * ph,
+        px2 - 0.12 * pw,
+        py1 + 0.80 * ph,
+    )
 
 
 def associate_ppe(track: TrackState, detections: list[Detection]) -> PPEAssociationResult:
     helmet_score = 0.0
     vest_score = 0.0
     ambiguity_flags: list[str] = []
+    head_region = _head_region(track.bbox)
+    torso_region = _torso_region(track.bbox)
 
     for detection in detections:
-        overlap = _intersection_ratio(track.bbox, detection.bbox)
-        if overlap <= 0:
-            continue
+        center_x, center_y = _item_center(detection.bbox)
         if detection.class_name == HELMET_CLASS:
-            helmet_score = max(helmet_score, detection.confidence * overlap)
+            if _inside_region(center_x, center_y, head_region):
+                helmet_score = max(helmet_score, detection.confidence)
         elif detection.class_name == VEST_CLASS:
-            vest_score = max(vest_score, detection.confidence * overlap)
-        if overlap > 0.55:
-            ambiguity_flags.append("high_overlap")
+            if _inside_region(center_x, center_y, torso_region):
+                vest_score = max(vest_score, detection.confidence)
+        else:
+            ambiguity_flags.append("unmapped_detection")
 
     return PPEAssociationResult(
         track_id=track.track_id,
