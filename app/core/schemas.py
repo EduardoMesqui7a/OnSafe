@@ -27,6 +27,8 @@ class CameraConfig(BaseModel):
         return value
 
     def build_stream_url(self) -> str:
+        if self.uses_browser_input():
+            return "browser://camera"
         if self.uses_local_device():
             return "local://0"
         auth = ""
@@ -40,7 +42,12 @@ class CameraConfig(BaseModel):
     def uses_local_device(self) -> bool:
         return str(self.host).strip() == "0"
 
+    def uses_browser_input(self) -> bool:
+        return str(self.host).strip().lower() in {"__browser__", "browser"}
+
     def get_capture_source(self) -> str | int:
+        if self.uses_browser_input():
+            raise ValueError("Browser camera input is handled by Streamlit UI, not OpenCV capture.")
         return 0 if self.uses_local_device() else self.build_stream_url()
 
 

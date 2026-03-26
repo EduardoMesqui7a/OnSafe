@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import streamlit as st
 
 from app.core.config import get_settings
@@ -16,22 +18,51 @@ def get_backend() -> OnSafeBackend:
 
 def render_camera_form(backend: OnSafeBackend) -> None:
     st.subheader("Cadastro de cameras")
+    source_mode = st.radio(
+        "Origem da camera",
+        options=["IP/RTSP", "Webcam do navegador", "Webcam local da maquina"],
+        horizontal=True,
+    )
+
     with st.form("camera_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("Nome da camera", placeholder="Portaria")
-            host = st.text_input("IP ou host", placeholder="192.168.0.10 ou 0 para webcam local")
-            port = st.number_input("Porta", min_value=0, max_value=65535, value=554)
-            protocol = st.selectbox("Protocolo", options=[item.value for item in Protocol], index=0)
+            if source_mode == "IP/RTSP":
+                host = st.text_input("IP ou host", placeholder="192.168.0.10")
+                port = st.number_input("Porta", min_value=0, max_value=65535, value=554)
+                protocol = st.selectbox("Protocolo", options=[item.value for item in Protocol], index=0)
+            elif source_mode == "Webcam local da maquina":
+                host = "0"
+                port = 0
+                protocol = Protocol.RTSP.value
+                st.text_input("IP ou host", value="0", disabled=True)
+                st.number_input("Porta", min_value=0, max_value=65535, value=0, disabled=True)
+                st.selectbox("Protocolo", options=[Protocol.RTSP.value], index=0, disabled=True)
+            else:
+                host = "__browser__"
+                port = 0
+                protocol = Protocol.RTSP.value
+                st.text_input("IP ou host", value="__browser__", disabled=True)
+                st.number_input("Porta", min_value=0, max_value=65535, value=0, disabled=True)
+                st.selectbox("Protocolo", options=[Protocol.RTSP.value], index=0, disabled=True)
         with col2:
-            username = st.text_input("Usuario")
-            password = st.text_input("Senha", type="password")
-            stream_path = st.text_input("Caminho do stream", placeholder="stream1")
+            if source_mode == "IP/RTSP":
+                username = st.text_input("Usuario")
+                password = st.text_input("Senha", type="password")
+                stream_path = st.text_input("Caminho do stream", placeholder="stream1")
+            else:
+                username = None
+                password = None
+                stream_path = ""
+                st.text_input("Usuario", value="", disabled=True)
+                st.text_input("Senha", value="", type="password", disabled=True)
+                st.text_input("Caminho do stream", value="", disabled=True)
             required_ppe = st.multiselect("EPIs obrigatorios", options=["helmet", "vest"], default=["helmet", "vest"])
         submitted = st.form_submit_button("Cadastrar camera")
         if submitted:
-            if not name or not host:
-                st.error("Informe ao menos nome e host da camera.")
+            if not name:
+                st.error("Informe o nome da camera.")
             else:
                 camera = backend.register_camera(
                     CameraConfig(
@@ -59,6 +90,75 @@ def _render_status_badge(health: str) -> str:
     return mapping.get(health, health.upper())
 
 
+def render_browser_camera(camera) -> None:
+    st.info("Modo navegador: funciona no Streamlit Cloud e usa a webcam do browser do usuario.")
+    snapshot = st.camera_input("Capturar frame da webcam", key=f"browser_camera_{camera.id}")
+    if snapshot is not None:
+        st.image(snapshot, caption=f"Frame capturado em {datetime.now().strftime('%H:%M:%S')}")
+        st.success("Webcam do navegador conectada. Este modo e ideal para testes e captura pontual no Streamlit Cloud.")
+    else:
+        st.caption("Permita o acesso a webcam no navegador e capture um frame para testar.")
+
+
+def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
+    status = backend.get_camera_status(camera.id)
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    with col1:
+        st.markdown(f"### {camera.name}")
+        st.caption(camera.build_stream_url())
+        if str(camera.host).strip() == "0":
+            st.caption("Fonte local detectada: webcam da maquina que executa o app")
+            st.warning(
+                "Host 0 funciona apenas quando o app roda localmente na mesma maquina. "
+                "No Streamlit Cloud, use a opcao Webcam do navegador ou uma camera IP/RTSP."
+            )
+        st.write(_render_status_badge(status.health.value))
+    with col2:
+        if st.button("Testar", key=f"test_{camera.id}"):
+            result = backend.test_camera(
+                CameraConfig(
+                    name=camera.name,
+                    host=camera.host,
+                    port=camera.port,
+                    username=camera.username,
+                    password=camera.password,
+                    protocol=camera.protocol,
+                    stream_path=camera.stream_path,
+                    enabled=camera.enabled,
+                    required_ppe=camera.required_ppe,
+                )
+            )
+            if result.success:
+                latency = f" Latencia: {result.latency_ms:.0f} ms" if result.latency_ms is not None else ""
+                st.success(f"{result.message}{latency}")
+            else:
+                st.warning(result.message)
+    with col3:
+        if st.button("Iniciar", key=f"start_{camera.id}"):
+            st.info(backend.start_monitoring(camera.id).message)
+    with col4:
+        if st.button("Parar", key=f"stop_{camera.id}"):
+            st.info(backend.stop_monitoring(camera.id).message)
+
+    metric1, metric2, metric3, metric4 = st.columns(4)
+    metric1.metric("Capture FPS", f"{status.capture_fps:.1f}")
+    metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
+    metric3.metric("Tracks ativos", status.active_tracks)
+    metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
+
+    packet = backend.get_live_snapshot(camera.id)
+    if packet is not None:
+        st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}")
+    else:
+        st.info("Sem frame disponivel ainda. Teste a conexao ou inicie o monitoramento.")
+
+    tracks = backend.list_active_tracks(camera.id)
+    if tracks:
+        st.write("Pessoas rastreadas:")
+        for track in tracks:
+            st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
+
+
 def render_monitoring(backend: OnSafeBackend) -> None:
     st.subheader("Monitoramento")
     cameras = backend.list_cameras()
@@ -74,63 +174,15 @@ def render_monitoring(backend: OnSafeBackend) -> None:
     )
 
     for camera in cameras:
+        if camera.id not in selected_ids:
+            continue
         with st.container(border=True):
-            status = backend.get_camera_status(camera.id)
-            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-            with col1:
+            if camera.uses_browser_input():
                 st.markdown(f"### {camera.name}")
                 st.caption(camera.build_stream_url())
-                if str(camera.host).strip() == "0":
-                    st.caption("Fonte local detectada: webcam do notebook")
-                    st.warning(
-                        "Host 0 funciona apenas quando o app roda localmente na mesma maquina. "
-                        "No Streamlit Cloud, use uma camera IP/RTSP."
-                    )
-                st.write(_render_status_badge(status.health.value))
-            with col2:
-                if st.button("Testar", key=f"test_{camera.id}"):
-                    result = backend.test_camera(
-                        CameraConfig(
-                            name=camera.name,
-                            host=camera.host,
-                            port=camera.port,
-                            username=camera.username,
-                            password=camera.password,
-                            protocol=camera.protocol,
-                            stream_path=camera.stream_path,
-                            enabled=camera.enabled,
-                            required_ppe=camera.required_ppe,
-                        )
-                    )
-                    if result.success:
-                        st.success(f"{result.message} Latencia: {result.latency_ms:.0f} ms")
-                    else:
-                        st.warning(result.message)
-            with col3:
-                if st.button("Iniciar", key=f"start_{camera.id}"):
-                    st.info(backend.start_monitoring(camera.id).message)
-            with col4:
-                if st.button("Parar", key=f"stop_{camera.id}"):
-                    st.info(backend.stop_monitoring(camera.id).message)
-
-            metric1, metric2, metric3, metric4 = st.columns(4)
-            metric1.metric("Capture FPS", f"{status.capture_fps:.1f}")
-            metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
-            metric3.metric("Tracks ativos", status.active_tracks)
-            metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
-
-            if camera.id in selected_ids:
-                packet = backend.get_live_snapshot(camera.id)
-                if packet is not None:
-                    st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}")
-                else:
-                    st.info("Sem frame disponivel ainda. Teste a conexao ou inicie o monitoramento.")
-
-                tracks = backend.list_active_tracks(camera.id)
-                if tracks:
-                    st.write("Pessoas rastreadas:")
-                    for track in tracks:
-                        st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
+                render_browser_camera(camera)
+            else:
+                render_network_or_local_camera(backend, camera)
 
 
 def render_events_and_reports(backend: OnSafeBackend) -> None:

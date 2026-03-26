@@ -32,6 +32,13 @@ class CameraService:
 
     def test_camera(self, config: CameraConfig) -> CameraTestResult:
         stream_url = config.build_stream_url()
+        if config.uses_browser_input():
+            return CameraTestResult(
+                success=True,
+                status=CameraHealth.ONLINE,
+                message="Webcam do navegador deve ser validada diretamente na interface Streamlit.",
+                stream_url=stream_url,
+            )
         capture_source = config.get_capture_source()
         if cv2 is None:
             return CameraTestResult(

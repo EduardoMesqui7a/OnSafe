@@ -35,3 +35,14 @@ def test_camera_config_host_zero_maps_to_local_device():
     assert config.uses_local_device() is True
     assert config.get_capture_source() == 0
     assert config.build_stream_url() == "local://0"
+
+
+def test_camera_config_browser_mode_uses_streamlit_source():
+    config = CameraConfig(
+        name="Browser",
+        host="__browser__",
+        port=0,
+        stream_path="",
+    )
+    assert config.uses_browser_input() is True
+    assert config.build_stream_url() == "browser://camera"
