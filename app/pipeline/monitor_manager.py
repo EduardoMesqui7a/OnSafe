@@ -105,6 +105,17 @@ class MonitorManager:
             active_tracks=len(bundle.tracker.list_active_tracks(camera_id)),
             latest_decision=bundle.worker.latest_decision,
             status_message=bundle.worker.status_message,
+            diagnostics={
+                "total_inferences": bundle.worker.total_inferences,
+                "total_events": bundle.worker.total_events,
+                "last_person_count": bundle.worker.last_person_count,
+                "last_detection_count": bundle.worker.last_detection_count,
+                "last_inference_ts": bundle.worker.last_inference_ts.isoformat() if bundle.worker.last_inference_ts else None,
+                "model_path": bundle.worker.yolo_engine.active_model_path,
+                "supports_ppe": bundle.worker.yolo_engine.supports_ppe(),
+                "supports_person": bundle.worker.yolo_engine.supports_person(),
+                "load_error": bundle.worker.yolo_engine.last_load_error,
+            },
         )
 
     def list_active_tracks(self, camera_id: int):

@@ -81,6 +81,7 @@ class CameraStatus(BaseModel):
     active_tracks: int = 0
     latest_decision: DecisionState | None = None
     status_message: str | None = None
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
 class FramePacket(BaseModel):

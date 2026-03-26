@@ -56,12 +56,24 @@ class BrowserCameraRuntime:
         self._infer_window_started = time.monotonic()
         self._event_history: dict[tuple[int, tuple[str, ...]], float] = {}
         self._lock = threading.Lock()
+        self.total_frames = 0
+        self.total_inferences = 0
+        self.total_events = 0
+        self.last_person_count = 0
+        self.last_detection_count = 0
+        self.last_frame_shape: tuple[int, int] | None = None
+        self.last_callback_ts: datetime | None = None
+        self.last_inference_ts: datetime | None = None
+        self.last_event_ts: datetime | None = None
 
     def process_frame(self, frame: Any) -> Any:
         timestamp = datetime.utcnow()
         with self._lock:
             self.frame_store.update_raw(self.camera_id, frame, timestamp)
             self.last_frame_ts = timestamp
+            self.last_callback_ts = timestamp
+            self.total_frames += 1
+            self.last_frame_shape = tuple(frame.shape[:2]) if hasattr(frame, "shape") else None
             self.health = CameraHealth.ONLINE
             self._capture_count += 1
             self._update_capture_fps()
@@ -81,6 +93,8 @@ class BrowserCameraRuntime:
 
             self.frame_store.update_annotated(self.camera_id, frame, timestamp)
             self._infer_count += 1
+            self.total_inferences += 1
+            self.last_inference_ts = timestamp
             self._update_inference_fps()
             if self.yolo_engine.last_load_error:
                 self.status_message = (
@@ -96,6 +110,8 @@ class BrowserCameraRuntime:
             else:
                 self.status_message = f"Modelo ativo: {self.yolo_engine.active_model_path}"
             person_detections = [item for item in detections if item.class_name == PERSON_CLASS and item.track_id is not None]
+            self.last_detection_count = len(detections)
+            self.last_person_count = len(person_detections)
             active_tracks = 0
 
             for person in person_detections:
@@ -128,6 +144,21 @@ class BrowserCameraRuntime:
             active_tracks=len(self.tracker.list_active_tracks(self.camera_id)),
             latest_decision=self.latest_decision,
             status_message=self.status_message,
+            diagnostics={
+                "total_frames": self.total_frames,
+                "total_inferences": self.total_inferences,
+                "total_events": self.total_events,
+                "last_person_count": self.last_person_count,
+                "last_detection_count": self.last_detection_count,
+                "last_frame_shape": self.last_frame_shape,
+                "last_callback_ts": self.last_callback_ts.isoformat() if self.last_callback_ts else None,
+                "last_inference_ts": self.last_inference_ts.isoformat() if self.last_inference_ts else None,
+                "last_event_ts": self.last_event_ts.isoformat() if self.last_event_ts else None,
+                "model_path": self.yolo_engine.active_model_path,
+                "supports_ppe": self.yolo_engine.supports_ppe(),
+                "supports_person": self.yolo_engine.supports_person(),
+                "load_error": self.yolo_engine.last_load_error,
+            },
         )
 
     def list_active_tracks(self):
@@ -161,6 +192,8 @@ class BrowserCameraRuntime:
         with get_session() as session:
             event = EventRepository(session).create(self.config.name, decision, image_path, video_path)
             session.commit()
+            self.total_events += 1
+            self.last_event_ts = datetime.utcnow()
             self.report_worker.enqueue(
                 ReportJob(
                     event=EventView(

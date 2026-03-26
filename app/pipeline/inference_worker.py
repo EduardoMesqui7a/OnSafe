@@ -50,6 +50,11 @@ class InferenceWorker:
         self.inference_fps = 0.0
         self.latest_decision: DecisionState | None = None
         self.status_message: str | None = None
+        self.total_inferences = 0
+        self.total_events = 0
+        self.last_person_count = 0
+        self.last_detection_count = 0
+        self.last_inference_ts: datetime | None = None
 
     def start(self) -> None:
         if not self._thread.is_alive():
@@ -100,6 +105,8 @@ class InferenceWorker:
 
             self.frame_store.update_annotated(self.camera_id, packet.frame, packet.timestamp)
             processed += 1
+            self.total_inferences += 1
+            self.last_inference_ts = packet.timestamp
             elapsed = time.monotonic() - window_start
             if elapsed >= 1.0:
                 self.inference_fps = processed / elapsed
@@ -122,6 +129,8 @@ class InferenceWorker:
             active_tracks = 0
             latest_decision = None
             person_detections = [item for item in detections if item.class_name == PERSON_CLASS and item.track_id is not None]
+            self.last_detection_count = len(detections)
+            self.last_person_count = len(person_detections)
             for person in person_detections:
                 active_tracks += 1
                 track = self.tracker.update_track(self.camera_id, person.track_id or 0, person.bbox, packet.timestamp)
@@ -152,6 +161,7 @@ class InferenceWorker:
                         with get_session() as session:
                             event = EventRepository(session).create(self.config.name, latest_decision, image_path, video_path)
                             session.commit()
+                            self.total_events += 1
                             self.report_worker.enqueue(
                                 ReportJob(
                                     event=EventView(

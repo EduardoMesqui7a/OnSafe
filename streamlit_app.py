@@ -120,6 +120,8 @@ def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
         st.write("Pessoas rastreadas:")
         for track in tracks:
             st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
+    with st.expander("Diagnostico detalhado", expanded=True):
+        st.json(status.diagnostics)
 
 
 def render_browser_camera(backend: OnSafeBackend, camera) -> None:
@@ -135,17 +137,16 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
             st.info("Para analise continua em nuvem, habilite streamlit-webrtc nas dependencias.")
         return
 
-    class BrowserVideoProcessor(VideoProcessorBase):
-        def recv(self, frame):
-            image = frame.to_ndarray(format="bgr24")
-            processed = runtime.process_frame(image)
-            return av.VideoFrame.from_ndarray(processed, format="bgr24")
+    def video_frame_callback(frame):
+        image = frame.to_ndarray(format="bgr24")
+        processed = runtime.process_frame(image)
+        return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
-    webrtc_streamer(
+    ctx = webrtc_streamer(
         key=f"browser_webrtc_{camera.id}",
         mode=WebRtcMode.SENDRECV,
         media_stream_constraints={"video": True, "audio": False},
-        video_processor_factory=BrowserVideoProcessor,
+        video_frame_callback=video_frame_callback,
         async_processing=True,
         video_html_attrs={
             "style": {
@@ -156,6 +157,7 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
             }
         },
     )
+    st.caption(f"WebRTC ativo: {bool(ctx and ctx.state.playing)}")
     _render_browser_status(backend, camera.id)
     st.caption("Ao manter o stream ativo, o backend continua analisando os frames, registrando eventos e gerando relatorios.")
 
@@ -219,6 +221,8 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
         st.write("Pessoas rastreadas:")
         for track in tracks:
             st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
+    with st.expander("Diagnostico detalhado", expanded=False):
+        st.json(status.diagnostics)
 
 
 @st.fragment(run_every=2)
