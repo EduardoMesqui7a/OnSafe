@@ -1,0 +1,14 @@
+.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+.env
+data/db/*.db
+data/evidence/images/*
+!data/evidence/images/.gitkeep
+data/evidence/videos/*
+!data/evidence/videos/.gitkeep
+data/reports/events/*
+!data/reports/events/.gitkeep
+data/reports/daily/*
+!data/reports/daily/.gitkeep

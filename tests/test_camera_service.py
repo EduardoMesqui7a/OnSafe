@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from app.core.schemas import CameraConfig
+from app.services.camera_service import CameraService
+from app.storage.database import init_database
+
+
+def test_register_and_list_camera(tmp_path):
+    init_database(f"sqlite:///{tmp_path / 'onsafe.db'}")
+    service = CameraService()
+    record = service.register_camera(
+        CameraConfig(
+            name="Portaria",
+            host="10.0.0.10",
+            port=554,
+            username="admin",
+            password="123",
+            stream_path="live",
+        )
+    )
+    cameras = service.list_cameras()
+    assert record.id > 0
+    assert len(cameras) == 1
+    assert cameras[0].required_ppe == ["helmet", "vest"]
+    assert cameras[0].build_stream_url() == "rtsp://admin:123@10.0.0.10:554/live"

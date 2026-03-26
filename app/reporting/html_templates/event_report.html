@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #243447; }
+      .header { border-bottom: 3px solid #0f4c5c; padding-bottom: 12px; margin-bottom: 24px; }
+      .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; color: white; font-weight: 700; }
+      .confirmed { background: #c0392b; }
+      .suspected { background: #b9770e; }
+      .meta { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+      .card { background: #f7f9fb; border: 1px solid #d9e2ec; border-radius: 12px; padding: 16px; }
+      img { max-width: 100%; border-radius: 12px; border: 1px solid #d9e2ec; }
+      h1, h2, h3 { margin-bottom: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>{{ title }}</h1>
+      <div class="badge {{ badge_class }}">{{ badge_label }}</div>
+    </div>
+    <div class="meta">
+      <div class="card"><strong>Camera</strong><br>{{ event.camera_name }}</div>
+      <div class="card"><strong>Pessoa</strong><br>{{ event.person_label }}</div>
+      <div class="card"><strong>Data/Hora</strong><br>{{ event.created_at }}</div>
+      <div class="card"><strong>EPI Ausente</strong><br>{{ event.missing_ppe|join(', ') }}</div>
+      <div class="card"><strong>Confianca</strong><br>{{ '%.2f'|format(event.confidence_score) }}</div>
+      <div class="card"><strong>Persistencia</strong><br>{{ '%.1f'|format(event.persistence_seconds) }}s</div>
+    </div>
+    <h2>Evidencia</h2>
+    {% if event.image_path %}
+      <img src="{{ image_uri }}" alt="Evidencia do evento">
+    {% else %}
+      <div class="card">Imagem nao disponivel neste ambiente.</div>
+    {% endif %}
+    <h2>Analise Tecnica</h2>
+    <div class="card">{{ event.rationale }}</div>
+  </body>
+</html>
