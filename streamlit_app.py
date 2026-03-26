@@ -64,19 +64,22 @@ def render_camera_form(backend: OnSafeBackend) -> None:
             if not name:
                 st.error("Informe o nome da camera.")
             else:
-                camera = backend.register_camera(
-                    CameraConfig(
-                        name=name,
-                        host=host,
-                        port=int(port),
-                        username=username or None,
-                        password=password or None,
-                        protocol=Protocol(protocol),
-                        stream_path=stream_path,
-                        required_ppe=list(required_ppe),
+                try:
+                    camera = backend.register_camera(
+                        CameraConfig(
+                            name=name,
+                            host=host,
+                            port=int(port),
+                            username=username or None,
+                            password=password or None,
+                            protocol=Protocol(protocol),
+                            stream_path=stream_path,
+                            required_ppe=list(required_ppe),
+                        )
                     )
-                )
-                st.success(f"Camera cadastrada com ID {camera.id}.")
+                    st.success(f"Camera cadastrada com ID {camera.id}.")
+                except ValueError as exc:
+                    st.error(str(exc))
 
 
 def _render_status_badge(health: str) -> str:

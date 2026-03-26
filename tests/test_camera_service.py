@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.core.schemas import CameraConfig
 from app.services.camera_service import CameraService
 from app.storage.database import init_database
@@ -46,3 +48,12 @@ def test_camera_config_browser_mode_uses_streamlit_source():
     )
     assert config.uses_browser_input() is True
     assert config.build_stream_url() == "browser://camera"
+
+
+def test_register_camera_with_duplicate_name_raises_clear_error(tmp_path):
+    init_database(f"sqlite:///{tmp_path / 'onsafe.db'}")
+    service = CameraService()
+    config = CameraConfig(name="Notebook", host="__browser__", port=0)
+    service.register_camera(config)
+    with pytest.raises(ValueError, match="Ja existe uma camera cadastrada"):
+        service.register_camera(config)

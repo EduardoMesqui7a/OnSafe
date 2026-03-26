@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import time
 
+from sqlalchemy.exc import IntegrityError
+
 try:
     import cv2
 except Exception:  # pragma: no cover - optional dependency
@@ -15,11 +17,14 @@ from app.storage.repositories import CameraRepository
 
 class CameraService:
     def register_camera(self, config: CameraConfig) -> CameraRecord:
-        with get_session() as session:
-            model = CameraRepository(session).create(config)
-            session.commit()
-            session.refresh(model)
-            return CameraRecord.model_validate(model)
+        try:
+            with get_session() as session:
+                model = CameraRepository(session).create(config)
+                session.commit()
+                session.refresh(model)
+                return CameraRecord.model_validate(model)
+        except IntegrityError as exc:
+            raise ValueError(f"Ja existe uma camera cadastrada com o nome '{config.name}'.") from exc
 
     def list_cameras(self) -> list[CameraRecord]:
         with get_session() as session:
