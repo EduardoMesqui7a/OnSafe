@@ -213,6 +213,7 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
             st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
 
 
+@st.fragment(run_every=2)
 def render_monitoring(backend: OnSafeBackend) -> None:
     st.subheader("Monitoramento")
     cameras = backend.list_cameras()
@@ -239,6 +240,7 @@ def render_monitoring(backend: OnSafeBackend) -> None:
                 render_network_or_local_camera(backend, camera)
 
 
+@st.fragment(run_every=2)
 def render_events_and_reports(backend: OnSafeBackend) -> None:
     st.subheader("Eventos recentes")
     events = backend.list_recent_events(limit=20)
