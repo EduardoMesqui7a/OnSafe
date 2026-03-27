@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -23,13 +24,6 @@ from app.core.config import get_settings
 from app.core.enums import Protocol
 from app.core.schemas import CameraConfig
 from app.integrations.streamlit_contracts import OnSafeBackend
-
-RTC_CONFIGURATION = {
-    "iceServers": [
-        {"urls": ["stun:stun.l.google.com:19302"]},
-        {"urls": ["stun:stun1.l.google.com:19302"]},
-    ]
-}
 
 BROWSER_MEDIA_CONSTRAINTS = {
     "video": {
@@ -129,6 +123,46 @@ def _read_bytes(path: str | None) -> bytes | None:
     if not file_path.exists():
         return None
     return file_path.read_bytes()
+
+
+def _read_secret(name: str) -> str | None:
+    if name in st.secrets:
+        value = st.secrets.get(name)
+        return str(value).strip() if value else None
+    value = os.getenv(name)
+    return value.strip() if value else None
+
+
+def _build_rtc_configuration() -> tuple[dict, bool]:
+    ice_servers = [
+        {"urls": ["stun:stun.l.google.com:19302"]},
+        {"urls": ["stun:stun1.l.google.com:19302"]},
+        {"urls": ["stun:stun2.l.google.com:19302"]},
+        {"urls": ["stun:stun3.l.google.com:19302"]},
+        {"urls": ["stun:stun4.l.google.com:19302"]},
+        {"urls": ["stun:global.stun.twilio.com:3478"]},
+    ]
+
+    turn_url = _read_secret("ONSAFE_TURN_URL")
+    turn_username = _read_secret("ONSAFE_TURN_USERNAME")
+    turn_password = _read_secret("ONSAFE_TURN_PASSWORD")
+    force_turn = (_read_secret("ONSAFE_FORCE_TURN") or "").lower() in {"1", "true", "yes", "on"}
+    turn_configured = bool(turn_url and turn_username and turn_password)
+
+    if turn_configured:
+        ice_servers.append(
+            {
+                "urls": [turn_url],
+                "username": turn_username,
+                "credential": turn_password,
+            }
+        )
+
+    rtc_configuration = {"iceServers": ice_servers}
+    if force_turn and turn_configured:
+        rtc_configuration["iceTransportPolicy"] = "relay"
+
+    return rtc_configuration, turn_configured
 
 
 def render_camera_form(backend: OnSafeBackend) -> None:
@@ -251,10 +285,11 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
         processed = runtime.process_frame(image)
         return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
+    rtc_configuration, turn_configured = _build_rtc_configuration()
     ctx = webrtc_streamer(
         key=f"browser_webrtc_{camera.id}",
         mode=WebRtcMode.SENDRECV,
-        rtc_configuration=RTC_CONFIGURATION,
+        rtc_configuration=rtc_configuration,
         media_stream_constraints=BROWSER_MEDIA_CONSTRAINTS,
         video_frame_callback=video_frame_callback,
         async_processing=True,
@@ -268,10 +303,12 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
         },
     )
     st.caption(f"WebRTC ativo: {bool(ctx and ctx.state.playing)}")
+    st.caption(f"TURN configurado: {'sim' if turn_configured else 'não'}")
     if not (ctx and ctx.state.playing):
         st.warning(
             "A conexão WebRTC ainda não foi estabelecida. Clique em START, escolha a câmera no navegador e aguarde alguns segundos. "
-            "Se continuar falhando, a rede pode estar bloqueando a negociação ICE/STUN."
+            "Se continuar falhando, a rede pode estar bloqueando a negociação ICE/STUN. Em redes mais restritas, configure um servidor TURN nos segredos "
+            "ONSAFE_TURN_URL, ONSAFE_TURN_USERNAME e ONSAFE_TURN_PASSWORD."
         )
     _render_browser_status(backend, camera.id)
     st.caption("Ao manter o stream ativo, o backend continua analisando os quadros, registrando eventos e gerando relatórios.")
