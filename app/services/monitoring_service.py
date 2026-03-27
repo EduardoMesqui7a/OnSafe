@@ -33,6 +33,9 @@ class MonitoringService:
         self.monitor_manager.start_camera(camera_id)
         return OperationResult(success=True, message=f"Monitoramento iniciado para camera {camera.name}.")
 
+    def register_browser_runtime(self, camera_id: int) -> None:
+        self._registered_runtime_ids.add(camera_id)
+
     def stop_monitoring(self, camera_id: int) -> OperationResult:
         if camera_id not in self._registered_runtime_ids:
             return OperationResult(success=True, message=f"Camera {camera_id} ja estava parada.")

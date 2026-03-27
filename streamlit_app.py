@@ -123,7 +123,8 @@ def _render_status_badge(health: str) -> str:
 
 @st.fragment(run_every=2)
 def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
-    status = backend.get_camera_status(camera_id)
+    runtime = backend.get_browser_runtime(camera_id)
+    status = runtime.get_status()
     if status.status_message:
         st.warning(status.status_message)
     metric1, metric2, metric3, metric4 = st.columns(4)
@@ -132,7 +133,11 @@ def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
     metric3.metric("Tracks ativos", status.active_tracks)
     metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
 
-    tracks = backend.list_active_tracks(camera_id)
+    packet = runtime.get_frame()
+    if packet is not None:
+        st.image(packet.frame, channels="BGR", caption=f"Preview processado: {packet.timestamp}", width=240)
+
+    tracks = runtime.list_active_tracks()
     if tracks:
         st.write("Pessoas rastreadas:")
         for track in tracks:

@@ -71,4 +71,6 @@ class OnSafeBackend:
             enabled=camera.enabled,
             required_ppe=camera.required_ppe,
         )
-        return self.monitor_manager.get_browser_runtime(camera_id, config)
+        runtime = self.monitor_manager.get_browser_runtime(camera_id, config)
+        self.monitoring_service.register_browser_runtime(camera_id)
+        return runtime
