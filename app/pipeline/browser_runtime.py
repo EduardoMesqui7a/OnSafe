@@ -14,7 +14,6 @@ from app.detectors.yolo_engine import YoloEngine
 from app.pipeline.compliance_engine import ComplianceEngine
 from app.pipeline.evidence_writer import EvidenceJob, EvidenceWriter
 from app.pipeline.frame_store import FrameStore
-from app.pipeline.inference_scheduler import InferenceScheduler
 from app.pipeline.ppe_association import associate_ppe
 from app.pipeline.report_worker import ReportJob, ReportWorker
 from app.pipeline.tracker_manager import TrackerManager
@@ -42,7 +41,8 @@ class BrowserCameraRuntime:
         self.frame_store = FrameStore(settings.ring_buffer_seconds, settings.preview_fps)
         self.tracker = TrackerManager()
         self.compliance_engine = ComplianceEngine()
-        self.scheduler = InferenceScheduler(settings.inference_fps)
+        self.min_inference_interval = 1.0 / max(settings.inference_fps, 1)
+        self._last_inference_attempt_monotonic = 0.0
         self.yolo_engine = YoloEngine(model_path, settings.inference_image_size)
         self.capture_fps = 0.0
         self.inference_fps = 0.0
@@ -57,6 +57,7 @@ class BrowserCameraRuntime:
         self._event_history: dict[tuple[int, tuple[str, ...]], float] = {}
         self._lock = threading.Lock()
         self.total_frames = 0
+        self.total_inference_attempts = 0
         self.total_inferences = 0
         self.total_events = 0
         self.last_person_count = 0
@@ -65,9 +66,11 @@ class BrowserCameraRuntime:
         self.last_callback_ts: datetime | None = None
         self.last_inference_ts: datetime | None = None
         self.last_event_ts: datetime | None = None
+        self.last_inference_error: str | None = None
 
     def process_frame(self, frame: Any) -> Any:
         timestamp = datetime.utcnow()
+        monotonic_now = time.monotonic()
         with self._lock:
             self.frame_store.update_raw(self.camera_id, frame, timestamp)
             self.last_frame_ts = timestamp
@@ -78,9 +81,11 @@ class BrowserCameraRuntime:
             self._capture_count += 1
             self._update_capture_fps()
 
-            if not self.scheduler.should_run():
+            if monotonic_now - self._last_inference_attempt_monotonic < self.min_inference_interval:
                 self._persist_status(active_tracks=len(self.tracker.list_active_tracks(self.camera_id)))
                 return frame
+            self._last_inference_attempt_monotonic = monotonic_now
+            self.total_inference_attempts += 1
 
             try:
                 detections = self.yolo_engine.infer(frame)
@@ -88,6 +93,7 @@ class BrowserCameraRuntime:
                 logger.exception("Browser inference failed for camera %s: %s", self.camera_id, exc)
                 self.health = CameraHealth.DEGRADED
                 self.status_message = str(exc)
+                self.last_inference_error = str(exc)
                 self._persist_status(active_tracks=len(self.tracker.list_active_tracks(self.camera_id)))
                 return frame
 
@@ -95,6 +101,7 @@ class BrowserCameraRuntime:
             self._infer_count += 1
             self.total_inferences += 1
             self.last_inference_ts = timestamp
+            self.last_inference_error = None
             self._update_inference_fps()
             if self.yolo_engine.last_load_error:
                 self.status_message = (
@@ -146,6 +153,7 @@ class BrowserCameraRuntime:
             status_message=self.status_message,
             diagnostics={
                 "total_frames": self.total_frames,
+                "total_inference_attempts": self.total_inference_attempts,
                 "total_inferences": self.total_inferences,
                 "total_events": self.total_events,
                 "last_person_count": self.last_person_count,
@@ -158,6 +166,8 @@ class BrowserCameraRuntime:
                 "supports_ppe": self.yolo_engine.supports_ppe(),
                 "supports_person": self.yolo_engine.supports_person(),
                 "load_error": self.yolo_engine.last_load_error,
+                "last_inference_error": self.last_inference_error,
+                "min_inference_interval": self.min_inference_interval,
             },
         )
 
