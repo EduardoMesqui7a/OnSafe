@@ -33,6 +33,7 @@ Aplicacao em Python para monitoramento de cameras IP com deteccao de EPI, tracki
 
 - `Ultralytics` e a dependencia mais sensivel do deploy. Para Streamlit Cloud, o projeto fixa `python-3.11` em `runtime.txt` para melhorar compatibilidade.
 - O `requirements.txt` instala `opencv-python-headless` depois de `ultralytics` para reduzir o risco de o ambiente carregar uma variante de OpenCV com dependencias graficas.
+- Se o deploy Linux precisar de `libGL.so.1`, o projeto usa um `packages.txt` minimo com `libgl1` e `libglib2.0-0`.
 - A geracao de PDF e opcional. Se o ambiente nao tiver renderer PDF disponivel, os relatorios HTML continuam sendo gerados normalmente.
 
 ## Exemplo rapido
