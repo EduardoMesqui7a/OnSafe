@@ -128,6 +128,7 @@ class ComplianceDecision(BaseModel):
     camera_id: int
     track_id: int
     person_label: str
+    track_bbox: tuple[int, int, int, int] | None = None
     state: DecisionState
     missing_ppe: list[str] = Field(default_factory=list)
     confidence_score: float = 0.0

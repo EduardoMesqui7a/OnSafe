@@ -58,6 +58,8 @@ class EvidenceWriter:
         filename = f"camera_{job.decision.camera_id}_track_{job.decision.track_id}_{timestamp}.jpg"
         path = Path(self.settings.evidence_image_dir) / filename
         cv2.imwrite(str(path), job.frame_packet.frame)
+        annotated_path = self._get_annotated_path(path)
+        cv2.imwrite(str(annotated_path), self._build_annotated_frame(job))
         return str(path)
 
     def _save_video(self, job: EvidenceJob) -> str | None:
@@ -78,3 +80,94 @@ class EvidenceWriter:
             writer.write(packet.frame)
         writer.release()
         return str(path)
+
+    def _build_annotated_frame(self, job: EvidenceJob):
+        frame = job.frame_packet.frame.copy()
+        bbox = job.decision.track_bbox
+        if bbox is None:
+            return frame
+
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 99, 132), 2)
+        cv2.putText(
+            frame,
+            job.decision.person_label,
+            (x1, max(28, y1 - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 99, 132),
+            2,
+            cv2.LINE_AA,
+        )
+
+        if "helmet" in job.decision.missing_ppe:
+            hx1, hy1, hx2, hy2 = self._head_region(bbox)
+            cv2.rectangle(frame, (hx1, hy1), (hx2, hy2), (255, 255, 255), 2)
+            cv2.putText(
+                frame,
+                "Sem capacete",
+                (hx1, max(24, hy1 - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
+        if "vest" in job.decision.missing_ppe:
+            tx1, ty1, tx2, ty2 = self._torso_region(bbox)
+            cv2.rectangle(frame, (tx1, ty1), (tx2, ty2), (0, 255, 255), 2)
+            cv2.putText(
+                frame,
+                "Sem colete",
+                (tx1, max(24, ty1 - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
+        alerts: list[str] = []
+        if "helmet" in job.decision.missing_ppe:
+            alerts.append("sem capacete")
+        if "vest" in job.decision.missing_ppe:
+            alerts.append("sem colete")
+        if alerts:
+            cv2.putText(
+                frame,
+                f"ALERTA: {', '.join(alerts)}",
+                (16, 36),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.9,
+                (0, 0, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
+        return frame
+
+    def _head_region(self, person_box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        px1, py1, px2, py2 = person_box
+        pw = px2 - px1
+        ph = py2 - py1
+        return (
+            int(px1 + 0.10 * pw),
+            int(py1),
+            int(px2 - 0.10 * pw),
+            int(py1 + 0.32 * ph),
+        )
+
+    def _torso_region(self, person_box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        px1, py1, px2, py2 = person_box
+        pw = px2 - px1
+        ph = py2 - py1
+        return (
+            int(px1 + 0.12 * pw),
+            int(py1 + 0.28 * ph),
+            int(px2 - 0.12 * pw),
+            int(py1 + 0.80 * ph),
+        )
+
+    def _get_annotated_path(self, image_path: Path) -> Path:
+        return image_path.with_name(f"{image_path.stem}_anotada{image_path.suffix}")

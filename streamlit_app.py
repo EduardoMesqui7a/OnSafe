@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -74,8 +75,19 @@ def _format_datetime(value) -> str:
     if not value:
         return "n/a"
     if isinstance(value, datetime):
-        return value.strftime("%d/%m/%Y %H:%M:%S")
+        settings = get_settings()
+        local_timezone = _get_local_timezone(settings.timezone_name)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(local_timezone).strftime("%d/%m/%Y %H:%M:%S")
     return str(value)
+
+
+def _get_local_timezone(timezone_name: str):
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return timezone(timedelta(hours=-3))
 
 
 def _format_decision(value) -> str:

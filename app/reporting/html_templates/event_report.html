@@ -23,7 +23,7 @@
         background: linear-gradient(180deg, #f5f9fc 0%, #ffffff 30%);
       }
       .shell {
-        max-width: 1120px;
+        max-width: 1180px;
         margin: 0 auto;
         background: white;
         border: 1px solid var(--line);
@@ -90,13 +90,14 @@
         border-radius: 16px;
         padding: 16px;
       }
-      .card-label {
+      .card-label,
+      .evidence-title {
         display: block;
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--muted);
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
       .card-value {
         font-size: 17px;
@@ -107,6 +108,11 @@
         grid-template-columns: 1.25fr 0.9fr;
         gap: 18px;
         align-items: start;
+      }
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
       }
       img {
         width: 100%;
@@ -126,7 +132,9 @@
       }
       @media (max-width: 860px) {
         body { padding: 12px; }
-        .header-top, .two-col { grid-template-columns: 1fr; display: grid; }
+        .header-top,
+        .two-col,
+        .evidence-grid { grid-template-columns: 1fr; display: grid; }
         .meta { grid-template-columns: 1fr; }
       }
     </style>
@@ -159,12 +167,23 @@
       <div class="section">
         <h2>Evidência visual</h2>
         <div class="two-col">
-          <div class="card">
-            {% if image_uri %}
-              <img src="{{ image_uri }}" alt="Evidência do evento">
-            {% else %}
-              <div class="analysis">Imagem de evidência não disponível neste ambiente.</div>
-            {% endif %}
+          <div class="evidence-grid">
+            <div class="card">
+              <span class="evidence-title">Cena original</span>
+              {% if image_uri %}
+                <img src="{{ image_uri }}" alt="Cena original do evento">
+              {% else %}
+                <div class="analysis">Imagem original não disponível neste ambiente.</div>
+              {% endif %}
+            </div>
+            <div class="card">
+              <span class="evidence-title">Cena anotada com o EPI ausente</span>
+              {% if annotated_image_uri %}
+                <img src="{{ annotated_image_uri }}" alt="Cena anotada do evento">
+              {% else %}
+                <div class="analysis">Imagem anotada não disponível neste ambiente.</div>
+              {% endif %}
+            </div>
           </div>
           <div class="card">
             <span class="card-label">Descrição técnica</span>
