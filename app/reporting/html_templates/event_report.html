@@ -149,8 +149,8 @@
         <div class="meta">
           <div class="card"><span class="card-label">Câmera</span><div class="card-value">{{ event.camera_name }}</div></div>
           <div class="card"><span class="card-label">Pessoa identificada</span><div class="card-value">{{ event.person_label }}</div></div>
-          <div class="card"><span class="card-label">Data e horário</span><div class="card-value">{{ event.created_at }}</div></div>
-          <div class="card"><span class="card-label">EPI ausente</span><div class="card-value">{{ event.missing_ppe|join(', ') }}</div></div>
+          <div class="card"><span class="card-label">Data e horário</span><div class="card-value">{{ occurred_at }}</div></div>
+          <div class="card"><span class="card-label">EPI ausente</span><div class="card-value">{{ missing_ppe_labels }}</div></div>
           <div class="card"><span class="card-label">Nível de confiança</span><div class="card-value">{{ '%.2f'|format(event.confidence_score) }}</div></div>
           <div class="card"><span class="card-label">Tempo de persistência</span><div class="card-value">{{ '%.1f'|format(event.persistence_seconds) }} s</div></div>
         </div>
@@ -160,7 +160,7 @@
         <h2>Evidência visual</h2>
         <div class="two-col">
           <div class="card">
-            {% if event.image_path %}
+            {% if image_uri %}
               <img src="{{ image_uri }}" alt="Evidência do evento">
             {% else %}
               <div class="analysis">Imagem de evidência não disponível neste ambiente.</div>
@@ -170,7 +170,7 @@
             <span class="card-label">Descrição técnica</span>
             <div class="analysis">
               O evento foi vinculado à <strong>{{ event.person_label }}</strong> na câmera <strong>{{ event.camera_name }}</strong>.
-              A análise indicou ausência de <strong>{{ event.missing_ppe|join(', ') }}</strong> com confiança agregada de
+              A análise indicou ausência de <strong>{{ missing_ppe_labels }}</strong> com confiança agregada de
               <strong>{{ '%.2f'|format(event.confidence_score) }}</strong> após persistência temporal de
               <strong>{{ '%.1f'|format(event.persistence_seconds) }} s</strong>.
             </div>
