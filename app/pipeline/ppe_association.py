@@ -42,7 +42,6 @@ def _torso_region(person_box: tuple[int, int, int, int]) -> tuple[float, float, 
 def associate_ppe(track: TrackState, detections: list[Detection]) -> PPEAssociationResult:
     helmet_score = 0.0
     vest_score = 0.0
-    ambiguity_flags: list[str] = []
     head_region = _head_region(track.bbox)
     torso_region = _torso_region(track.bbox)
 
@@ -54,8 +53,6 @@ def associate_ppe(track: TrackState, detections: list[Detection]) -> PPEAssociat
         elif detection.class_name == VEST_CLASS:
             if _inside_region(center_x, center_y, torso_region):
                 vest_score = max(vest_score, detection.confidence)
-        else:
-            ambiguity_flags.append("unmapped_detection")
 
     return PPEAssociationResult(
         track_id=track.track_id,
@@ -64,6 +61,6 @@ def associate_ppe(track: TrackState, detections: list[Detection]) -> PPEAssociat
         vest_present=vest_score >= 0.45,
         helmet_confidence=helmet_score,
         vest_confidence=vest_score,
-        ambiguity_flags=sorted(set(ambiguity_flags)),
+        ambiguity_flags=[],
         overlap_score=max(helmet_score, vest_score),
     )

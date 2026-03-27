@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.core.schemas import TrackState
-from app.detectors.class_map import HELMET_CLASS, VEST_CLASS, normalize_class_name
+from app.detectors.class_map import HELMET_CLASS, PERSON_CLASS, VEST_CLASS, normalize_class_name
 from app.detectors.yolo_engine import Detection
 from app.pipeline.ppe_association import associate_ppe
 
@@ -34,3 +34,21 @@ def test_class_aliases_are_normalized_to_supported_names():
     assert normalize_class_name("colete") == "vest"
     assert normalize_class_name("hardhat") == "helmet"
     assert normalize_class_name("no helmet") is None
+
+
+def test_associate_ppe_does_not_mark_person_detection_as_ambiguity():
+    track = TrackState(
+        camera_id=1,
+        track_id=100,
+        display_person_id=1,
+        label="Pessoa 1",
+        bbox=(0, 0, 100, 200),
+        stability_hits=3,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+    )
+    detections = [
+        Detection(class_name=PERSON_CLASS, confidence=0.92, bbox=(0, 0, 100, 200), track_id=100),
+    ]
+    association = associate_ppe(track, detections)
+    assert association.ambiguity_flags == []
