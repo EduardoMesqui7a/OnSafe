@@ -4,37 +4,188 @@
     <meta charset="utf-8">
     <title>{{ title }}</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 32px; color: #243447; }
-      .header { border-bottom: 3px solid #0f4c5c; padding-bottom: 12px; margin-bottom: 24px; }
-      .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; color: white; font-weight: 700; }
-      .confirmed { background: #c0392b; }
-      .suspected { background: #b9770e; }
-      .meta { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
-      .card { background: #f7f9fb; border: 1px solid #d9e2ec; border-radius: 12px; padding: 16px; }
-      img { max-width: 100%; border-radius: 12px; border: 1px solid #d9e2ec; }
-      h1, h2, h3 { margin-bottom: 8px; }
+      :root {
+        --navy: #133b5c;
+        --teal: #1f6f78;
+        --ink: #1f2937;
+        --muted: #667085;
+        --line: #dbe4ee;
+        --surface: #f7fafc;
+        --warn: #b45309;
+        --danger: #b42318;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        padding: 32px;
+        color: var(--ink);
+        background: linear-gradient(180deg, #f5f9fc 0%, #ffffff 30%);
+      }
+      .shell {
+        max-width: 1120px;
+        margin: 0 auto;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+      }
+      .header {
+        padding: 28px 32px;
+        background: linear-gradient(135deg, var(--navy), var(--teal));
+        color: white;
+      }
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .eyebrow {
+        letter-spacing: 0.08em;
+        font-size: 12px;
+        text-transform: uppercase;
+        opacity: 0.8;
+        margin-bottom: 10px;
+      }
+      .header h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+      }
+      .header p {
+        margin: 0;
+        max-width: 640px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        color: white;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .confirmed { background: var(--danger); }
+      .suspected { background: var(--warn); }
+      .section {
+        padding: 28px 32px;
+        border-top: 1px solid var(--line);
+      }
+      .section h2 {
+        margin: 0 0 16px;
+        font-size: 20px;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .card-label {
+        display: block;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .card-value {
+        font-size: 17px;
+        font-weight: 600;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1.25fr 0.9fr;
+        gap: 18px;
+        align-items: start;
+      }
+      img {
+        width: 100%;
+        display: block;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        object-fit: cover;
+      }
+      .analysis {
+        line-height: 1.65;
+        font-size: 15px;
+      }
+      .footer {
+        padding: 20px 32px 28px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 860px) {
+        body { padding: 12px; }
+        .header-top, .two-col { grid-template-columns: 1fr; display: grid; }
+        .meta { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
-    <div class="header">
-      <h1>{{ title }}</h1>
-      <div class="badge {{ badge_class }}">{{ badge_label }}</div>
+    <div class="shell">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <div class="eyebrow">Relatório técnico de não conformidade</div>
+            <h1>{{ title }}</h1>
+            <p>Documento gerado automaticamente pelo OnSafe com evidência visual, identificação da pessoa, contexto temporal e justificativa técnica da classificação.</p>
+          </div>
+          <div class="badge {{ badge_class }}">{{ badge_label }}</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Resumo executivo</h2>
+        <div class="meta">
+          <div class="card"><span class="card-label">Câmera</span><div class="card-value">{{ event.camera_name }}</div></div>
+          <div class="card"><span class="card-label">Pessoa identificada</span><div class="card-value">{{ event.person_label }}</div></div>
+          <div class="card"><span class="card-label">Data e horário</span><div class="card-value">{{ event.created_at }}</div></div>
+          <div class="card"><span class="card-label">EPI ausente</span><div class="card-value">{{ event.missing_ppe|join(', ') }}</div></div>
+          <div class="card"><span class="card-label">Nível de confiança</span><div class="card-value">{{ '%.2f'|format(event.confidence_score) }}</div></div>
+          <div class="card"><span class="card-label">Tempo de persistência</span><div class="card-value">{{ '%.1f'|format(event.persistence_seconds) }} s</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Evidência visual</h2>
+        <div class="two-col">
+          <div class="card">
+            {% if event.image_path %}
+              <img src="{{ image_uri }}" alt="Evidência do evento">
+            {% else %}
+              <div class="analysis">Imagem de evidência não disponível neste ambiente.</div>
+            {% endif %}
+          </div>
+          <div class="card">
+            <span class="card-label">Descrição técnica</span>
+            <div class="analysis">
+              O evento foi vinculado à <strong>{{ event.person_label }}</strong> na câmera <strong>{{ event.camera_name }}</strong>.
+              A análise indicou ausência de <strong>{{ event.missing_ppe|join(', ') }}</strong> com confiança agregada de
+              <strong>{{ '%.2f'|format(event.confidence_score) }}</strong> após persistência temporal de
+              <strong>{{ '%.1f'|format(event.persistence_seconds) }} s</strong>.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Análise técnica</h2>
+        <div class="card analysis">{{ event.rationale }}</div>
+      </div>
+
+      <div class="footer">
+        Relatório gerado automaticamente pelo sistema OnSafe.
+      </div>
     </div>
-    <div class="meta">
-      <div class="card"><strong>Camera</strong><br>{{ event.camera_name }}</div>
-      <div class="card"><strong>Pessoa</strong><br>{{ event.person_label }}</div>
-      <div class="card"><strong>Data/Hora</strong><br>{{ event.created_at }}</div>
-      <div class="card"><strong>EPI Ausente</strong><br>{{ event.missing_ppe|join(', ') }}</div>
-      <div class="card"><strong>Confianca</strong><br>{{ '%.2f'|format(event.confidence_score) }}</div>
-      <div class="card"><strong>Persistencia</strong><br>{{ '%.1f'|format(event.persistence_seconds) }}s</div>
-    </div>
-    <h2>Evidencia</h2>
-    {% if event.image_path %}
-      <img src="{{ image_uri }}" alt="Evidencia do evento">
-    {% else %}
-      <div class="card">Imagem nao disponivel neste ambiente.</div>
-    {% endif %}
-    <h2>Analise Tecnica</h2>
-    <div class="card">{{ event.rationale }}</div>
   </body>
 </html>

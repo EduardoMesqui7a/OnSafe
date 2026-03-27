@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 try:
     import av
@@ -44,23 +46,96 @@ def get_backend() -> OnSafeBackend:
     return OnSafeBackend(settings)
 
 
+DECISION_LABELS = {
+    "compliant": "Conforme",
+    "suspected_non_compliance": "Não conformidade suspeita",
+    "confirmed_non_compliance": "Não conformidade confirmada",
+    "discarded_due_to_uncertainty": "Descartado por incerteza",
+}
+
+REPORT_KIND_LABELS = {
+    "event": "Relatório de evento",
+    "daily": "Consolidado diário",
+}
+
+REPORT_STATUS_LABELS = {
+    "pending": "Pendente",
+    "generated": "Gerado",
+    "failed": "Falhou",
+}
+
+PPE_LABELS = {
+    "helmet": "capacete",
+    "vest": "colete",
+}
+
+
+def _format_datetime(value) -> str:
+    if not value:
+        return "n/a"
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m/%Y %H:%M:%S")
+    return str(value)
+
+
+def _format_decision(value) -> str:
+    if not value:
+        return "n/a"
+    raw = value.value if hasattr(value, "value") else str(value)
+    return DECISION_LABELS.get(raw, raw)
+
+
+def _format_report_kind(value) -> str:
+    raw = value.value if hasattr(value, "value") else str(value)
+    return REPORT_KIND_LABELS.get(raw, raw)
+
+
+def _format_report_status(value) -> str:
+    raw = value.value if hasattr(value, "value") else str(value)
+    return REPORT_STATUS_LABELS.get(raw, raw)
+
+
+def _format_ppe_list(items: list[str]) -> str:
+    if not items:
+        return "n/a"
+    return ", ".join(PPE_LABELS.get(item, item) for item in items)
+
+
+def _read_text(path: str | None) -> str | None:
+    if not path:
+        return None
+    file_path = Path(path)
+    if not file_path.exists():
+        return None
+    return file_path.read_text(encoding="utf-8")
+
+
+def _read_bytes(path: str | None) -> bytes | None:
+    if not path:
+        return None
+    file_path = Path(path)
+    if not file_path.exists():
+        return None
+    return file_path.read_bytes()
+
+
 def render_camera_form(backend: OnSafeBackend) -> None:
-    st.subheader("Cadastro de cameras")
+    st.subheader("Cadastro de câmeras")
     source_mode = st.radio(
-        "Origem da camera",
-        options=["IP/RTSP", "Webcam do navegador", "Webcam local da maquina"],
+        "Origem da câmera",
+        options=["IP/RTSP", "Webcam do navegador", "Webcam local da máquina"],
         horizontal=True,
     )
 
     with st.form("camera_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("Nome da camera", placeholder="Portaria")
+            name = st.text_input("Nome da câmera", placeholder="Portaria")
             if source_mode == "IP/RTSP":
                 host = st.text_input("IP ou host", placeholder="192.168.0.10")
                 port = st.number_input("Porta", min_value=0, max_value=65535, value=554)
                 protocol = st.selectbox("Protocolo", options=[item.value for item in Protocol], index=0)
-            elif source_mode == "Webcam local da maquina":
+            elif source_mode == "Webcam local da máquina":
                 host = "0"
                 port = 0
                 protocol = Protocol.RTSP.value
@@ -76,21 +151,21 @@ def render_camera_form(backend: OnSafeBackend) -> None:
                 st.selectbox("Protocolo", options=[Protocol.RTSP.value], index=0, disabled=True)
         with col2:
             if source_mode == "IP/RTSP":
-                username = st.text_input("Usuario")
+                username = st.text_input("Usuário")
                 password = st.text_input("Senha", type="password")
                 stream_path = st.text_input("Caminho do stream", placeholder="stream1")
             else:
                 username = None
                 password = None
                 stream_path = ""
-                st.text_input("Usuario", value="", disabled=True)
+                st.text_input("Usuário", value="", disabled=True)
                 st.text_input("Senha", value="", type="password", disabled=True)
                 st.text_input("Caminho do stream", value="", disabled=True)
-            required_ppe = st.multiselect("EPIs obrigatorios", options=["helmet", "vest"], default=["helmet", "vest"])
-        submitted = st.form_submit_button("Cadastrar camera")
+            required_ppe = st.multiselect("EPIs obrigatórios", options=["helmet", "vest"], default=["helmet", "vest"])
+        submitted = st.form_submit_button("Cadastrar câmera")
         if submitted:
             if not name:
-                st.error("Informe o nome da camera.")
+                st.error("Informe o nome da câmera.")
             else:
                 try:
                     camera = backend.register_camera(
@@ -105,7 +180,7 @@ def render_camera_form(backend: OnSafeBackend) -> None:
                             required_ppe=list(required_ppe),
                         )
                     )
-                    st.success(f"Camera cadastrada com ID {camera.id}.")
+                    st.success(f"Câmera cadastrada com ID {camera.id}.")
                 except ValueError as exc:
                     st.error(str(exc))
 
@@ -114,7 +189,7 @@ def _render_status_badge(health: str) -> str:
     mapping = {
         "online": "ONLINE",
         "offline": "OFFLINE",
-        "degraded": "INSTAVEL",
+        "degraded": "INSTÁVEL",
         "starting": "INICIANDO",
         "stopped": "PARADA",
     }
@@ -131,32 +206,32 @@ def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
     metric1.metric("Capture FPS", f"{status.capture_fps:.1f}")
     metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
     metric3.metric("Tracks ativos", status.active_tracks)
-    metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
+    metric4.metric("Última decisão", _format_decision(status.latest_decision))
 
     packet = runtime.get_frame()
     if packet is not None:
-        st.image(packet.frame, channels="BGR", caption=f"Preview processado: {packet.timestamp}", width=240)
+        st.image(packet.frame, channels="BGR", caption=f"Pré-visualização processada: {_format_datetime(packet.timestamp)}", width=240)
 
     tracks = runtime.list_active_tracks()
     if tracks:
         st.write("Pessoas rastreadas:")
         for track in tracks:
-            st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
-    with st.expander("Diagnostico detalhado", expanded=True):
+            st.write(f"- {track.label} | Track {track.track_id} | confirmações {track.stability_hits}")
+    with st.expander("Diagnóstico detalhado", expanded=True):
         st.json(status.diagnostics)
 
 
 def render_browser_camera(backend: OnSafeBackend, camera) -> None:
-    st.info("Modo navegador: funciona no Streamlit Cloud e usa a webcam do browser do usuario.")
+    st.info("Modo navegador: funciona no Streamlit Cloud e usa a webcam do navegador do usuário.")
     runtime = backend.get_browser_runtime(camera.id)
     st.write(_render_status_badge(runtime.get_status().health.value))
 
     if webrtc_streamer is None or av is None:
-        st.warning("streamlit-webrtc indisponivel neste ambiente. Usando captura pontual como fallback.")
-        snapshot = st.camera_input("Capturar frame da webcam", key=f"browser_camera_fallback_{camera.id}")
+        st.warning("O streamlit-webrtc não está disponível neste ambiente. Usando captura pontual como alternativa.")
+        snapshot = st.camera_input("Capturar quadro da webcam", key=f"browser_camera_fallback_{camera.id}")
         if snapshot is not None:
-            st.image(snapshot, caption=f"Frame capturado em {datetime.now().strftime('%H:%M:%S')}")
-            st.info("Para analise continua em nuvem, habilite streamlit-webrtc nas dependencias.")
+            st.image(snapshot, caption=f"Quadro capturado às {datetime.now().strftime('%H:%M:%S')}")
+            st.info("Para análise contínua em nuvem, habilite o streamlit-webrtc nas dependências.")
         return
 
     def video_frame_callback(frame):
@@ -183,11 +258,11 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
     st.caption(f"WebRTC ativo: {bool(ctx and ctx.state.playing)}")
     if not (ctx and ctx.state.playing):
         st.warning(
-            "A conexao WebRTC ainda nao foi estabelecida. Clique em START, escolha a camera no navegador e aguarde alguns segundos. "
-            "Se continuar falhando, a rede pode estar bloqueando a negociacao ICE/STUN."
+            "A conexão WebRTC ainda não foi estabelecida. Clique em START, escolha a câmera no navegador e aguarde alguns segundos. "
+            "Se continuar falhando, a rede pode estar bloqueando a negociação ICE/STUN."
         )
     _render_browser_status(backend, camera.id)
-    st.caption("Ao manter o stream ativo, o backend continua analisando os frames, registrando eventos e gerando relatorios.")
+    st.caption("Ao manter o stream ativo, o backend continua analisando os quadros, registrando eventos e gerando relatórios.")
 
 
 @st.fragment(run_every=2)
@@ -198,10 +273,10 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
         st.markdown(f"### {camera.name}")
         st.caption(camera.build_stream_url())
         if str(camera.host).strip() == "0":
-            st.caption("Fonte local detectada: webcam da maquina que executa o app")
+            st.caption("Fonte local detectada: webcam da máquina que executa o app")
             st.warning(
-                "Host 0 funciona apenas quando o app roda localmente na mesma maquina. "
-                "No Streamlit Cloud, use a opcao Webcam do navegador ou uma camera IP/RTSP."
+                "Host 0 funciona apenas quando o app roda localmente na mesma máquina. "
+                "No Streamlit Cloud, use a opção Webcam do navegador ou uma câmera IP/RTSP."
             )
         st.write(_render_status_badge(status.health.value))
     with col2:
@@ -220,7 +295,7 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
                 )
             )
             if result.success:
-                latency = f" Latencia: {result.latency_ms:.0f} ms" if result.latency_ms is not None else ""
+                latency = f" Latência: {result.latency_ms:.0f} ms" if result.latency_ms is not None else ""
                 st.success(f"{result.message}{latency}")
             else:
                 st.warning(result.message)
@@ -235,22 +310,22 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
     metric1.metric("Capture FPS", f"{status.capture_fps:.1f}")
     metric2.metric("Inference FPS", f"{status.inference_fps:.1f}")
     metric3.metric("Tracks ativos", status.active_tracks)
-    metric4.metric("Ultima decisao", status.latest_decision.value if status.latest_decision else "n/a")
+    metric4.metric("Última decisão", _format_decision(status.latest_decision))
     if status.status_message:
         st.warning(status.status_message)
 
     packet = backend.get_live_snapshot(camera.id)
     if packet is not None:
-        st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}", width=240)
+        st.image(packet.frame, channels="BGR", caption=f"Último quadro: {_format_datetime(packet.timestamp)}", width=240)
     else:
-        st.info("Sem frame disponivel ainda. Teste a conexao ou inicie o monitoramento.")
+        st.info("Ainda não há quadro disponível. Teste a conexão ou inicie o monitoramento.")
 
     tracks = backend.list_active_tracks(camera.id)
     if tracks:
         st.write("Pessoas rastreadas:")
         for track in tracks:
-            st.write(f"- {track.label} | Track {track.track_id} | hits {track.stability_hits}")
-    with st.expander("Diagnostico detalhado", expanded=False):
+            st.write(f"- {track.label} | Track {track.track_id} | confirmações {track.stability_hits}")
+    with st.expander("Diagnóstico detalhado", expanded=False):
         st.json(status.diagnostics)
 
 
@@ -258,11 +333,11 @@ def render_monitoring(backend: OnSafeBackend) -> None:
     st.subheader("Monitoramento")
     cameras = backend.list_cameras()
     if not cameras:
-        st.info("Cadastre ao menos uma camera para iniciar os testes no Streamlit.")
+        st.info("Cadastre ao menos uma câmera para iniciar os testes no Streamlit.")
         return
 
     selected_ids = st.multiselect(
-        "Cameras para exibir",
+        "Câmeras para exibir",
         options=[camera.id for camera in cameras],
         default=[camera.id for camera in cameras[:1]],
         format_func=lambda camera_id: next(camera.name for camera in cameras if camera.id == camera_id),
@@ -270,7 +345,7 @@ def render_monitoring(backend: OnSafeBackend) -> None:
 
     selected_cameras = [camera for camera in cameras if camera.id in selected_ids]
     if not selected_cameras:
-        st.info("Selecione pelo menos uma camera para exibir.")
+        st.info("Selecione pelo menos uma câmera para exibir.")
         return
 
     column_count = min(4, max(1, len(selected_cameras)))
@@ -295,28 +370,71 @@ def render_events_and_reports(backend: OnSafeBackend) -> None:
     if events:
         for event in events:
             with st.container(border=True):
-                st.markdown(f"**{event.camera_name}** | {event.person_label}")
+                top_left, top_right = st.columns([2, 1])
+                with top_left:
+                    st.markdown(f"**{event.camera_name}** | {event.person_label}")
+                    st.caption(f"Registrado em {_format_datetime(event.created_at)}")
+                with top_right:
+                    st.markdown(f"**{_format_decision(event.decision_state)}**")
                 st.write(
-                    f"Estado: {event.decision_state.value} | EPI ausente: {', '.join(event.missing_ppe) or 'n/a'} | "
-                    f"Confianca: {event.confidence_score:.2f} | Persistencia: {event.persistence_seconds:.1f}s"
+                    f"EPI ausente: {_format_ppe_list(event.missing_ppe)} | "
+                    f"Confiança: {event.confidence_score:.2f} | Persistência: {event.persistence_seconds:.1f}s"
                 )
                 st.caption(event.rationale)
                 if event.image_path:
-                    st.write(f"Evidencia: `{event.image_path}`")
+                    image_path = Path(event.image_path)
+                    if image_path.exists():
+                        st.image(str(image_path), caption="Evidência do evento", width=260)
+                    st.code(str(event.image_path), language="text")
     else:
         st.info("Nenhum evento salvo ainda.")
 
-    st.subheader("Relatorios")
-    if st.button("Gerar consolidado diario agora"):
+    st.subheader("Relatórios")
+    if st.button("Gerar consolidado diário agora"):
         path = backend.build_daily_report()
-        st.success(f"Relatorio diario gerado em {path}")
+        st.success(f"Relatório diário gerado em {path}")
 
     reports = backend.list_reports(limit=20)
     if reports:
         for report in reports:
-            st.write(f"- {report.title} | {report.report_kind.value} | {report.status.value}")
+            with st.container(border=True):
+                header_left, header_right = st.columns([2, 1])
+                with header_left:
+                    st.markdown(f"**{report.title}**")
+                    st.caption(f"{_format_report_kind(report.report_kind)} • {_format_datetime(report.created_at)}")
+                with header_right:
+                    st.markdown(f"**{_format_report_status(report.status)}**")
+
+                download_cols = st.columns(2)
+                html_content = _read_text(report.html_path)
+                pdf_bytes = _read_bytes(report.pdf_path)
+
+                with download_cols[0]:
+                    if html_content and report.html_path:
+                        html_name = Path(report.html_path).name
+                        st.download_button(
+                            "Baixar relatório HTML",
+                            data=html_content,
+                            file_name=html_name,
+                            mime="text/html",
+                            key=f"download_html_{report.id}",
+                        )
+                with download_cols[1]:
+                    if pdf_bytes and report.pdf_path:
+                        pdf_name = Path(report.pdf_path).name
+                        st.download_button(
+                            "Baixar relatório PDF",
+                            data=pdf_bytes,
+                            file_name=pdf_name,
+                            mime="application/pdf",
+                            key=f"download_pdf_{report.id}",
+                        )
+
+                if html_content:
+                    with st.expander("Visualizar relatório", expanded=False):
+                        components.html(html_content, height=720, scrolling=True)
     else:
-        st.info("Nenhum relatorio gerado ainda.")
+        st.info("Nenhum relatório gerado ainda.")
 
 
 def main() -> None:
@@ -335,7 +453,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     st.title("OnSafe")
-    st.caption("Monitoramento de cameras IP com IA de EPI")
+    st.caption("Monitoramento de câmeras IP com IA de EPI")
     backend = get_backend()
 
     render_camera_form(backend)

@@ -54,7 +54,7 @@ class ComplianceEngine:
                 persistence_seconds=0.0,
                 valid_inferences=state.valid_inferences,
                 ambiguity_flags=[],
-                rationale="Track ainda instavel; classificacao conservadora aplicada.",
+                rationale="Track ainda instável; classificação conservadora aplicada.",
             )
 
         state.valid_inferences += 1
@@ -72,7 +72,7 @@ class ComplianceEngine:
                 persistence_seconds=0.0,
                 valid_inferences=state.valid_inferences,
                 ambiguity_flags=list(state.ambiguity_flags),
-                rationale="Pessoa com EPIs obrigatorios presentes dentro dos limiares configurados.",
+                rationale="Pessoa com EPIs obrigatórios presentes dentro dos limiares configurados.",
             )
 
         if state.first_non_compliant_at is None:
@@ -96,7 +96,7 @@ class ComplianceEngine:
                 persistence_seconds=persistence,
                 valid_inferences=state.valid_inferences,
                 ambiguity_flags=list(state.ambiguity_flags),
-                rationale="Nao conformidade suspeita, mas ainda sem persistencia ou amostragem suficiente.",
+                rationale="Não conformidade suspeita, mas ainda sem persistência ou amostragem suficiente.",
             )
 
         if state.ambiguity_flags:
@@ -110,7 +110,7 @@ class ComplianceEngine:
                 persistence_seconds=persistence,
                 valid_inferences=state.valid_inferences,
                 ambiguity_flags=list(state.ambiguity_flags),
-                rationale="Ambiguidade relevante encontrada na associacao pessoa/EPI; evento marcado como duvidoso.",
+                rationale="Ambiguidade relevante encontrada na associação pessoa/EPI; evento marcado como duvidoso.",
             )
 
         return ComplianceDecision(
@@ -124,7 +124,7 @@ class ComplianceEngine:
             valid_inferences=state.valid_inferences,
             ambiguity_flags=list(state.ambiguity_flags),
             rationale=(
-                f"Nao conformidade confirmada apos {persistence:.1f}s de persistencia, "
-                f"{state.valid_inferences} inferencias validas e track estavel."
+                f"Não conformidade confirmada após {persistence:.1f}s de persistência, "
+                f"{state.valid_inferences} inferências válidas e track estável."
             ),
         )

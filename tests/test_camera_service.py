@@ -55,5 +55,5 @@ def test_register_camera_with_duplicate_name_raises_clear_error(tmp_path):
     service = CameraService()
     config = CameraConfig(name="Notebook", host="__browser__", port=0)
     service.register_camera(config)
-    with pytest.raises(ValueError, match="Ja existe uma camera cadastrada"):
+    with pytest.raises(ValueError, match="Já existe uma câmera cadastrada"):
         service.register_camera(config)

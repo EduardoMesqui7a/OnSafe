@@ -33,7 +33,7 @@ class Settings(BaseModel):
     event_cooldown_seconds: int = 15
     reconnect_delay_seconds: float = 2.0
     max_test_frames: int = 5
-    report_title: str = "OnSafe - Relatorio Tecnico de EPI"
+    report_title: str = "OnSafe - Relatório Técnico de EPI"
     timezone_name: str = "America/Sao_Paulo"
 
     def ensure_directories(self) -> None:

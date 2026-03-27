@@ -24,7 +24,7 @@ class CameraService:
                 session.refresh(model)
                 return CameraRecord.model_validate(model)
         except IntegrityError as exc:
-            raise ValueError(f"Ja existe uma camera cadastrada com o nome '{config.name}'.") from exc
+            raise ValueError(f"Já existe uma câmera cadastrada com o nome '{config.name}'.") from exc
 
     def list_cameras(self) -> list[CameraRecord]:
         with get_session() as session:
@@ -41,7 +41,7 @@ class CameraService:
             return CameraTestResult(
                 success=True,
                 status=CameraHealth.ONLINE,
-                message="Webcam do navegador deve ser validada diretamente na interface Streamlit.",
+                message="A webcam do navegador deve ser validada diretamente na interface do Streamlit.",
                 stream_url=stream_url,
             )
         capture_source = config.get_capture_source()
@@ -49,7 +49,7 @@ class CameraService:
             return CameraTestResult(
                 success=False,
                 status=CameraHealth.DEGRADED,
-                message="OpenCV nao esta disponivel neste ambiente.",
+                message="O OpenCV não está disponível neste ambiente.",
                 stream_url=stream_url,
             )
         started = time.perf_counter()
@@ -58,7 +58,7 @@ class CameraService:
             return CameraTestResult(
                 success=False,
                 status=CameraHealth.OFFLINE,
-                message="Nao foi possivel abrir a camera local." if config.uses_local_device() else "Nao foi possivel abrir o stream.",
+                message="Não foi possível abrir a câmera local." if config.uses_local_device() else "Não foi possível abrir o stream.",
                 stream_url=stream_url,
             )
         ok, _ = capture.read()
@@ -67,7 +67,7 @@ class CameraService:
         return CameraTestResult(
             success=ok,
             status=CameraHealth.ONLINE if ok else CameraHealth.DEGRADED,
-            message="Camera local acessivel." if ok and config.uses_local_device() else "Stream acessivel." if ok else "Conexao aberta, mas sem leitura de frame.",
+            message="Câmera local acessível." if ok and config.uses_local_device() else "Stream acessível." if ok else "Conexão aberta, mas sem leitura de frame.",
             latency_ms=latency_ms,
             stream_url=stream_url,
         )
