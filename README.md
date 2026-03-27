@@ -35,7 +35,8 @@ Aplicacao em Python para monitoramento de cameras IP com deteccao de EPI, tracki
 - O `requirements.txt` instala `opencv-python-headless` depois de `ultralytics` para reduzir o risco de o ambiente carregar uma variante de OpenCV com dependencias graficas.
 - Se o deploy Linux precisar de `libGL.so.1` e `libgthread-2.0.so.0`, o projeto usa um `packages.txt` minimo com `libgl1` e `libglib2.0-0t64`, que e o nome esperado para essa familia de bibliotecas no Debian `trixie`.
 - O tracker do Ultralytics exige `lap`, por isso a dependencia e instalada explicitamente em `requirements.txt` para evitar auto-instalacao em runtime.
-- A geracao de PDF e opcional. Se o ambiente nao tiver renderer PDF disponivel, os relatorios HTML continuam sendo gerados normalmente.
+- O PDF e gerado a partir do mesmo HTML exibido no preview, para manter o mesmo layout visual do relatorio.
+- No Streamlit Cloud, a geracao de PDF depende de `weasyprint` e das bibliotecas Linux declaradas em `packages.txt`.
 
 ## Exemplo rapido
 

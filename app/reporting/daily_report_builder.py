@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.config import Settings
 from app.core.enums import ReportKind, ReportStatus
+from app.reporting.pdf_renderer import PdfReportRenderer
 from app.storage.database import get_session
 from app.storage.repositories import EventRepository, ReportRepository
 
@@ -20,6 +21,7 @@ class DailyReportBuilder:
             loader=FileSystemLoader(str(template_dir)),
             autoescape=select_autoescape(),
         )
+        self.pdf_renderer = PdfReportRenderer()
 
     def build_for_today(self) -> str:
         local_timezone = self._get_local_timezone()
@@ -46,12 +48,13 @@ class DailyReportBuilder:
             )
             output_path = Path(self.settings.reports_daily_dir) / f"daily_{today}.html"
             output_path.write_text(html, encoding="utf-8")
+            pdf_path = self.pdf_renderer.render_pdf_from_html(str(output_path))
             ReportRepository(session).create(
                 report_kind=ReportKind.DAILY.value,
                 status=ReportStatus.GENERATED.value,
                 title=f"Consolidado diário {today}",
                 html_path=str(output_path),
-                pdf_path=None,
+                pdf_path=pdf_path,
             )
             session.commit()
             return str(output_path)

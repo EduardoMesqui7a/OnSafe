@@ -7,4 +7,5 @@ streamlit-webrtc>=0.47
 ultralytics>=8.3,<9
 opencv-python-headless>=4.9
 lap>=0.5.12
+weasyprint>=65,<67
 pytest>=8.2
