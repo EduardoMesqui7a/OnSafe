@@ -31,7 +31,8 @@ Aplicacao em Python para monitoramento de cameras IP com deteccao de EPI, tracki
 
 ## Observacoes
 
-- `WeasyPrint` e `Ultralytics` sao opcionais em runtime. O backend continua operacional com fallback quando esses pacotes nao estiverem disponiveis.
+- `Ultralytics` e a dependencia mais sensivel do deploy. Para Streamlit Cloud, o projeto fixa `python-3.11` em `runtime.txt` para melhorar compatibilidade.
+- A geracao de PDF e opcional. Se o ambiente nao tiver renderer PDF disponivel, os relatorios HTML continuam sendo gerados normalmente.
 
 ## Exemplo rapido
 
