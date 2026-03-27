@@ -21,6 +21,22 @@ from app.core.enums import Protocol
 from app.core.schemas import CameraConfig
 from app.integrations.streamlit_contracts import OnSafeBackend
 
+RTC_CONFIGURATION = {
+    "iceServers": [
+        {"urls": ["stun:stun.l.google.com:19302"]},
+        {"urls": ["stun:stun1.l.google.com:19302"]},
+    ]
+}
+
+BROWSER_MEDIA_CONSTRAINTS = {
+    "video": {
+        "width": {"ideal": 240},
+        "height": {"ideal": 180},
+        "frameRate": {"ideal": 6, "max": 10},
+    },
+    "audio": False,
+}
+
 
 @st.cache_resource
 def get_backend() -> OnSafeBackend:
@@ -105,6 +121,7 @@ def _render_status_badge(health: str) -> str:
     return mapping.get(health, health.upper())
 
 
+@st.fragment(run_every=2)
 def _render_browser_status(backend: OnSafeBackend, camera_id: int) -> None:
     status = backend.get_camera_status(camera_id)
     if status.status_message:
@@ -145,23 +162,30 @@ def render_browser_camera(backend: OnSafeBackend, camera) -> None:
     ctx = webrtc_streamer(
         key=f"browser_webrtc_{camera.id}",
         mode=WebRtcMode.SENDRECV,
-        media_stream_constraints={"video": True, "audio": False},
+        rtc_configuration=RTC_CONFIGURATION,
+        media_stream_constraints=BROWSER_MEDIA_CONSTRAINTS,
         video_frame_callback=video_frame_callback,
         async_processing=True,
         video_html_attrs={
             "style": {
                 "width": "100%",
-                "maxWidth": "320px",
-                "height": "220px",
+                "maxWidth": "240px",
+                "height": "160px",
                 "margin": "0 auto",
             }
         },
     )
     st.caption(f"WebRTC ativo: {bool(ctx and ctx.state.playing)}")
+    if not (ctx and ctx.state.playing):
+        st.warning(
+            "A conexao WebRTC ainda nao foi estabelecida. Clique em START, escolha a camera no navegador e aguarde alguns segundos. "
+            "Se continuar falhando, a rede pode estar bloqueando a negociacao ICE/STUN."
+        )
     _render_browser_status(backend, camera.id)
     st.caption("Ao manter o stream ativo, o backend continua analisando os frames, registrando eventos e gerando relatorios.")
 
 
+@st.fragment(run_every=2)
 def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
     status = backend.get_camera_status(camera.id)
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
@@ -212,7 +236,7 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
 
     packet = backend.get_live_snapshot(camera.id)
     if packet is not None:
-        st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}", use_container_width=True)
+        st.image(packet.frame, channels="BGR", caption=f"Ultimo frame: {packet.timestamp}", width=240)
     else:
         st.info("Sem frame disponivel ainda. Teste a conexao ou inicie o monitoramento.")
 
@@ -225,7 +249,6 @@ def render_network_or_local_camera(backend: OnSafeBackend, camera) -> None:
         st.json(status.diagnostics)
 
 
-@st.fragment(run_every=2)
 def render_monitoring(backend: OnSafeBackend) -> None:
     st.subheader("Monitoramento")
     cameras = backend.list_cameras()
@@ -245,7 +268,7 @@ def render_monitoring(backend: OnSafeBackend) -> None:
         st.info("Selecione pelo menos uma camera para exibir.")
         return
 
-    column_count = min(3, max(1, len(selected_cameras)))
+    column_count = min(4, max(1, len(selected_cameras)))
     rows = [selected_cameras[index : index + column_count] for index in range(0, len(selected_cameras), column_count)]
     for row in rows:
         columns = st.columns(column_count)
